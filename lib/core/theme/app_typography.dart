@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-/// Mitra typography system built on Google Fonts Inter.
-///
+/// Mitra typography system.
 /// Follows Material 3 type scale with custom sizes tuned
 /// for financial data readability and Indian numeral density.
 abstract final class AppTypography {
-  static String? get _fontFamily => GoogleFonts.inter().fontFamily;
+  static const String _fontFamily = 'Roboto';
 
   // ──────────────────────────────────────────
   // Display — hero numbers (balance)
   // ──────────────────────────────────────────
 
-  static TextStyle get displayLarge => TextStyle(
+  static TextStyle get displayLarge => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 32,
         fontWeight: FontWeight.w700,
@@ -20,7 +18,7 @@ abstract final class AppTypography {
         letterSpacing: -0.5,
       );
 
-  static TextStyle get displayMedium => TextStyle(
+  static TextStyle get displayMedium => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 28,
         fontWeight: FontWeight.w700,
@@ -32,21 +30,21 @@ abstract final class AppTypography {
   // Headline — screen titles
   // ──────────────────────────────────────────
 
-  static TextStyle get headlineLarge => TextStyle(
+  static TextStyle get headlineLarge => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 28,
         fontWeight: FontWeight.w600,
         height: 1.3,
       );
 
-  static TextStyle get headlineMedium => TextStyle(
+  static TextStyle get headlineMedium => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 24,
         fontWeight: FontWeight.w600,
         height: 1.3,
       );
 
-  static TextStyle get headlineSmall => TextStyle(
+  static TextStyle get headlineSmall => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 20,
         fontWeight: FontWeight.w600,
@@ -57,14 +55,14 @@ abstract final class AppTypography {
   // Title — card headers, list items
   // ──────────────────────────────────────────
 
-  static TextStyle get titleLarge => TextStyle(
+  static TextStyle get titleLarge => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 20,
         fontWeight: FontWeight.w600,
         height: 1.4,
       );
 
-  static TextStyle get titleMedium => TextStyle(
+  static TextStyle get titleMedium => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 16,
         fontWeight: FontWeight.w500,
@@ -72,7 +70,7 @@ abstract final class AppTypography {
         letterSpacing: 0.15,
       );
 
-  static TextStyle get titleSmall => TextStyle(
+  static TextStyle get titleSmall => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w500,
@@ -84,7 +82,7 @@ abstract final class AppTypography {
   // Body — main content
   // ──────────────────────────────────────────
 
-  static TextStyle get bodyLarge => TextStyle(
+  static TextStyle get bodyLarge => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 16,
         fontWeight: FontWeight.w400,
@@ -92,7 +90,7 @@ abstract final class AppTypography {
         letterSpacing: 0.15,
       );
 
-  static TextStyle get bodyMedium => TextStyle(
+  static TextStyle get bodyMedium => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w400,
@@ -100,7 +98,7 @@ abstract final class AppTypography {
         letterSpacing: 0.25,
       );
 
-  static TextStyle get bodySmall => TextStyle(
+  static TextStyle get bodySmall => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 12,
         fontWeight: FontWeight.w400,
@@ -112,7 +110,7 @@ abstract final class AppTypography {
   // Label — buttons, captions, tags
   // ──────────────────────────────────────────
 
-  static TextStyle get labelLarge => TextStyle(
+  static TextStyle get labelLarge => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w500,
@@ -120,7 +118,7 @@ abstract final class AppTypography {
         letterSpacing: 0.1,
       );
 
-  static TextStyle get labelMedium => TextStyle(
+  static TextStyle get labelMedium => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 12,
         fontWeight: FontWeight.w500,
@@ -128,7 +126,7 @@ abstract final class AppTypography {
         letterSpacing: 0.5,
       );
 
-  static TextStyle get labelSmall => TextStyle(
+  static TextStyle get labelSmall => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 11,
         fontWeight: FontWeight.w500,
@@ -141,7 +139,7 @@ abstract final class AppTypography {
   // ──────────────────────────────────────────
 
   /// Large balance display (₹1,23,456.00)
-  static TextStyle get balanceAmount => TextStyle(
+  static TextStyle get balanceAmount => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 36,
         fontWeight: FontWeight.w800,
@@ -150,7 +148,7 @@ abstract final class AppTypography {
       );
 
   /// Transaction amount in list items
-  static TextStyle get transactionAmount => TextStyle(
+  static TextStyle get transactionAmount => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 16,
         fontWeight: FontWeight.w600,
@@ -159,7 +157,7 @@ abstract final class AppTypography {
       );
 
   /// Small monetary value (sub-stats)
-  static TextStyle get moneySmall => TextStyle(
+  static TextStyle get moneySmall => const TextStyle(
         fontFamily: _fontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w600,
