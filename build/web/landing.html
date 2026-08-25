@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mitra — Digital Association Book | Android APK & Web App</title>
+  <meta name="description" content="Digital Association & Committee Book — transparent, accountable, simple financial management. Developed by Kadega Sai Kumar.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-dark: #3730A3;
+      --accent: #10B981;
+      --bg: #0F172A;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Ambient Background Glows */
+    .glow-1 {
+      position: fixed;
+      top: -100px;
+      left: -100px;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.25) 0%, rgba(0,0,0,0) 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .glow-2 {
+      position: fixed;
+      bottom: -100px;
+      right: -100px;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.2) 0%, rgba(0,0,0,0) 70%);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header Navbar */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 0;
+      margin-bottom: 3rem;
+    }
+
+    .logo-box {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      background: linear-gradient(135deg, #6366F1, #4F46E5);
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    }
+
+    .logo-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, #FFFFFF, #CBD5E1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-badge {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.35rem 0.85rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      padding: 2rem 0 3rem;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(99, 102, 241, 0.15);
+      color: #A5B4FC;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 0.4rem 1rem;
+      border-radius: 30px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #FFFFFF 30%, #94A3B8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      max-width: 650px;
+      margin: 0 auto 2.5rem;
+    }
+
+    /* Action Buttons */
+    .cta-group {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 3rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      padding: 1rem 2rem;
+      border-radius: 14px;
+      font-weight: 700;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: all 0.25s ease;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #10B981, #059669);
+      color: white;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.5);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-2px);
+    }
+
+    /* Features Grid */
+    .features-title {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 800;
+      margin-bottom: 2rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 4rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.75rem;
+      backdrop-filter: blur(12px);
+      transition: transform 0.25s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+    }
+
+    .card-icon {
+      font-size: 2.2rem;
+      margin-bottom: 1rem;
+    }
+
+    .card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #F1F5F9;
+    }
+
+    .card p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    /* Installation Steps */
+    .install-box {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(124, 58, 237, 0.15));
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 4rem;
+    }
+
+    .install-box h3 {
+      font-size: 1.3rem;
+      font-weight: 800;
+      margin-bottom: 1rem;
+      color: #E2E8F0;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+    }
+
+    .step-item {
+      background: rgba(15, 23, 42, 0.6);
+      padding: 1.2rem;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .step-number {
+      background: #4F46E5;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* Developer Branding Footer */
+    footer {
+      text-align: center;
+      padding: 3rem 0 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .dev-card {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      max-width: 500px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .dev-name {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #6366F1;
+    }
+
+    .dev-role {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .portfolio-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      color: #38BDF8;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.9rem;
+    }
+
+    .portfolio-link:hover {
+      text-decoration: underline;
+    }
+
+    .copyright {
+      font-size: 0.85rem;
+      color: #64748B;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-1"></div>
+  <div class="glow-2"></div>
+
+  <div class="container">
+    <!-- Header Navbar -->
+    <header>
+      <div class="logo-box">
+        <div class="logo-icon">🏛️</div>
+        <div class="logo-title">Mitra</div>
+      </div>
+      <div class="nav-badge">v1.0.0 Stable</div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-badge">✨ Digital Organization & Transaction Book</div>
+      <h1>Transparent, Accountable & Simple Association Ledger</h1>
+      <p>Manage committee finances, track festival budgets, issue official WhatsApp digital receipts, and maintain real-time transparent accounts for your organization.</p>
+
+      <div class="cta-group">
+        <a href="mitra-app-v1.0.0.apk" class="btn btn-primary" download>
+          <span>📱</span> Download Android APK
+        </a>
+        <a href="index.html" class="btn btn-secondary">
+          <span>🌐</span> Launch Web App
+        </a>
+      </div>
+    </section>
+
+    <!-- Features Grid -->
+    <h2 class="features-title">Core Features & Capabilities</h2>
+    <div class="grid">
+      <div class="card">
+        <div class="card-icon">💬</div>
+        <h3>One-Tap WhatsApp Receipts</h3>
+        <p>Generate formatted digital text receipts with logo, donor name, amount in words, and QR online verification links.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🎯</div>
+        <h3>Target Goal Meter</h3>
+        <p>Live percentage completion ring and progress bar for committee fundraising targets and event budgets.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🎙️</div>
+        <h3>Voice Quick Entry</h3>
+        <p>Spoken natural language assistant that converts voice phrases into structured income and expense entries instantly.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🧾</div>
+        <h3>AI Bill OCR Scanner</h3>
+        <p>Extracts amounts, dates, and vendor names automatically from camera photos of paper bills and payment screenshots.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🪔</div>
+        <h3>3D Festive Themes</h3>
+        <p>Beautiful presets for Ganesh Utsav, Diwali, Durga Puja, Youth Sports, Housing Societies, and Trusts.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-icon">🔒</div>
+        <h3>Financial Security</h3>
+        <p>Zero floating-point drift integer math in paise with Row-Level Security (RLS) and permanent audit logging.</p>
+      </div>
+    </div>
+
+    <!-- Installation Steps -->
+    <div class="install-box">
+      <h3>📱 How to Install Android APK (3 Steps)</h3>
+      <div class="steps">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <strong>Download APK</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted);">Tap the green button above to download the APK file.</p>
+        </div>
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <strong>Allow Source</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted);">Enable "Install from unknown sources" if prompted by Chrome.</p>
+        </div>
+        <div class="step-item">
+          <div class="step-number">3</div>
+          <strong>Install & Enjoy</strong>
+          <p style="font-size:0.85rem; color:var(--text-muted);">Tap the downloaded file and click Install to open Mitra!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Developer Copyright & Portfolio Footer -->
+    <footer>
+      <div class="dev-card">
+        <div style="font-size:0.75rem; letter-spacing:1px; color:#94A3B8; font-weight:700; margin-bottom:0.25rem;">DESIGNED & ENGINEERED BY</div>
+        <div class="dev-name">Kadega Sai Kumar</div>
+        <div class="dev-role">Full Stack Developer & AI Systems Engineer</div>
+        <a href="https://saikumar-devfolio.vercel.app/" target="_blank" class="portfolio-link">
+          🌐 View Developer Portfolio →
+        </a>
+      </div>
+      <div class="copyright">© 2026 Kadega Sai Kumar. All rights reserved.</div>
+    </footer>
+  </div>
+</body>
+</html>

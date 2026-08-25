@@ -1,0 +1,7 @@
+{
+    "terminal.integrated.env.windows": {
+        "PATHEXT": ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC",
+        "PATH": "C:\\Windows\\System32;C:\\Windows;C:\\Windows\\System32\\Wbem;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;C:\\Program Files\\Git\\cmd;C:\\Program Files\\Git\\bin;C:\\flutter\\flutter\\bin;C:\\flutter\\flutter\\bin\\cache\\dart-sdk\\bin"
+    },
+    "terminal.integrated.defaultProfile.windows": "Command Prompt"
+}

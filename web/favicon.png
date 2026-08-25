@@ -1,0 +1,2 @@
+// This is the "web bootstrap" file that Flutter uses to initialize the web app.
+// This file is referenced by index.html via flutter_bootstrap.js.
