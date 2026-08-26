@@ -33,6 +33,10 @@ jobs:
       - name: Build Release APK
         run: flutter build apk --release --android-skip-build-dependency-validation --no-tree-shake-icons
 
+      - name: Copy Named APK for Release
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/mitra-app.apk
+
       - name: Upload Release APK as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -43,16 +47,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
-          name: "Mitra v1.0.0 — Latest Build"
+          name: "Mitra v1.0.1 — Latest Build"
           body: |
-            ## 📱 Mitra — Digital Association Ledger
+            ## 📱 Mitra — Digital Association Ledger (v1.0.1)
 
-            **Latest stable APK build** — auto-updated on every push to `main`.
+            **Latest stable APK build** with Multi-Year Tracking, Target Goal Persistence & Android Crash Fixes.
 
-            ### How to Install
-            1. Download `mitra-app-v1.0.0.apk` below
-            2. Enable "Install from unknown sources" if prompted
-            3. Tap the file and install!
-          files: build/app/outputs/flutter-apk/app-release.apk
+            ### How to Install on Android
+            1. **Uninstall any previous version of Mitra** from your phone first.
+            2. Download **`app-release.apk`** or **`mitra-app.apk`** below.
+            3. Open your phone's **Files / Downloads** app and tap the file.
+            4. If prompted with *"Install unknown apps"*, tap **Settings** and enable **"Allow from this source"**.
+            5. If Google Play Protect warns about an unverified app, tap **"More details"** ➔ **"Install anyway"**.
+          files: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/mitra-app.apk
           make_latest: true
           prerelease: false
