@@ -13,21 +13,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-subprojects {
-    def configureAndroid = {
-        if (project.hasProperty('android')) {
-            project.android {
-                compileSdkVersion 36
-            }
-        }
-    }
-    if (project.state.executed) {
-        configureAndroid()
-    } else {
-        project.afterEvaluate(configureAndroid)
-    }
-}
-
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
