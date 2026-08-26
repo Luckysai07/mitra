@@ -1,9 +1,12 @@
-name: Build Android Release APK
+name: Build & Release Android APK
 
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -30,8 +33,26 @@ jobs:
       - name: Build Release APK
         run: flutter build apk --release --android-skip-build-dependency-validation --no-tree-shake-icons
 
-      - name: Upload Release APK
+      - name: Upload Release APK as artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Create/Update GitHub Release (latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Mitra v1.0.0 — Latest Build"
+          body: |
+            ## 📱 Mitra — Digital Association Ledger
+
+            **Latest stable APK build** — auto-updated on every push to `main`.
+
+            ### How to Install
+            1. Download `mitra-app-v1.0.0.apk` below
+            2. Enable "Install from unknown sources" if prompted
+            3. Tap the file and install!
+          files: build/app/outputs/flutter-apk/app-release.apk
+          make_latest: true
+          prerelease: false
