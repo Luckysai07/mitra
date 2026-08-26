@@ -1,27 +1,16 @@
 {
   "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/((?!download-apk).*)",
+      "destination": "/index.html"
+    }
+  ],
   "redirects": [
     {
       "source": "/download-apk",
       "destination": "https://github.com/Luckysai07/mitra/releases/latest/download/app-release.apk",
       "statusCode": 302
-    }
-  ],
-  "headers": [
-    {
-      "source": "/download-apk",
-      "headers": [
-        { "key": "Content-Type", "value": "application/vnd.android.package-archive" }
-      ]
-    }
-  ],
-  "routes": [
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
     }
   ]
 }
