@@ -12,6 +12,8 @@ import '../../../../services/supabase_service.dart';
 import 'package:mitra/features/organization/providers/org_providers.dart';
 import 'package:mitra/features/transactions/providers/transaction_providers.dart';
 
+import 'package:mitra/features/organization/providers/permissions_provider.dart';
+
 class DefaultCategories {
   static const income = [
     {'id': 'donation', 'name': 'Donation / Chanda', 'icon': Icons.card_giftcard_rounded},
@@ -86,6 +88,12 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       return;
     }
 
+    // Check user permissions for approval
+    final permsAsync = ref.read(userPermissionsProvider);
+    final userPerms = permsAsync.valueOrNull ?? UserPermissions.empty;
+    final isAutoApproved = userPerms.canApproveTransactions || userPerms.isOwner || userPerms.isOrgCreator;
+    final approvalStatus = isAutoApproved ? 'approved' : 'pending';
+
     setState(() => _isLoading = true);
 
     try {
@@ -103,26 +111,41 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         'person_contact': _personContactController.text.trim(),
         'payment_method': _paymentMethod,
         'status': 'active',
-        'approval_status': 'approved',
+        'approval_status': approvalStatus,
+        if (isAutoApproved) 'approved_by': user?.id,
+        if (isAutoApproved) 'approved_at': DateTime.now().toIso8601String(),
         'notes': _notesController.text.trim(),
         'created_by': user?.id ?? activeOrg.createdBy,
         'created_at': DateTime.now().toIso8601String(),
       });
 
       ref.invalidate(orgTransactionsProvider);
+      ref.invalidate(pendingTransactionsCountProvider);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${_type == 'income' ? 'Income' : 'Expense'} of ${CurrencyFormatter.formatPaise(paise)} recorded!',
+      if (isAutoApproved) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${_type == 'income' ? 'Income' : 'Expense'} of ${CurrencyFormatter.formatPaise(paise)} recorded & approved! ✅',
+            ),
+            backgroundColor: _type == 'income'
+                ? AppColors.income
+                : AppColors.expense,
           ),
-          backgroundColor: _type == 'income'
-              ? AppColors.income
-              : AppColors.expense,
-        ),
-      );
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${_type == 'income' ? 'Income' : 'Expense'} entry of ${CurrencyFormatter.formatPaise(paise)} submitted! Awaiting Owner/President approval ⏳',
+            ),
+            backgroundColor: AppColors.pending,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
 
       context.pop();
     } catch (e) {
@@ -137,6 +160,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

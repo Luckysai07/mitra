@@ -123,9 +123,44 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> w
                           size: 20,
                         ),
                       ),
-                      title: Text(
-                        t.description ?? (isExpense ? 'Expense' : 'Income'),
-                        style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              t.description ?? (isExpense ? 'Expense' : 'Income'),
+                              style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (t.approvalStatus == 'pending') ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.pending.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: AppColors.pending.withOpacity(0.4)),
+                              ),
+                              child: const Text(
+                                '⏳ Pending',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.pending),
+                              ),
+                            ),
+                          ] else if (t.approvalStatus == 'rejected') ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.expense.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                '❌ Rejected',
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.expense),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       subtitle: Text(
                         '${t.personName ?? 'General'} • ${t.paymentMethod.toUpperCase()} • ${t.date.toString().split(' ')[0]}',

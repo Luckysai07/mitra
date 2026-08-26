@@ -89,6 +89,11 @@ class MembersScreen extends ConsumerWidget {
           ),
           actions: [
             IconButton(
+              icon: const Icon(Icons.admin_panel_settings_rounded, color: Color(0xFFD97706)),
+              tooltip: 'Owner Dashboard & Permissions',
+              onPressed: () => context.push('/org/owner-dashboard'),
+            ),
+            IconButton(
               icon: const Icon(Icons.share_rounded),
               tooltip: 'Share Invite Code',
               onPressed: () {

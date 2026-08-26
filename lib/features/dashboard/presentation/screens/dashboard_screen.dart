@@ -18,6 +18,7 @@ import '../../../../services/whatsapp_share_service.dart';
 import 'package:mitra/features/organization/providers/org_providers.dart';
 import 'package:mitra/features/organization/providers/season_providers.dart';
 import 'package:mitra/features/transactions/providers/transaction_providers.dart';
+import 'package:mitra/features/organization/providers/permissions_provider.dart';
 import '../widgets/fundraising_goal_widget.dart';
 import '../widgets/season_selector_bar.dart';
 
@@ -443,9 +444,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
 
                   for (final t in seasonTxns) {
                     if (t.type == 'income') {
-                      totalIncomePaise += t.amountPaise;
+                      totalIncomePaise += t.amountPaise.toInt();
                     } else {
-                      totalExpensePaise += t.amountPaise;
+                      totalExpensePaise += t.amountPaise.toInt();
                     }
                   }
 

@@ -20,6 +20,8 @@ import '../../features/reports/presentation/screens/reports_screen.dart';
 import '../../features/settings/presentation/screens/more_screen.dart';
 import 'scaffold_with_nav.dart';
 
+import '../../features/organization/presentation/screens/owner_dashboard_screen.dart';
+
 /// App-wide route names for type-safe navigation.
 abstract final class AppRoutes {
   // Auth
@@ -35,6 +37,7 @@ abstract final class AppRoutes {
   static const String orgSwitcher = '/org/switch';
   static const String orgSettings = '/org/settings';
   static const String members = '/org/members';
+  static const String ownerDashboard = '/org/owner-dashboard';
   static const String auditLogs = '/org/audit-logs';
   static const String eventBudgets = '/org/budgets';
 
@@ -117,6 +120,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.members,
         builder: (context, state) => const MembersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.ownerDashboard,
+        builder: (context, state) => const OwnerDashboardScreen(),
       ),
       GoRoute(
         path: AppRoutes.auditLogs,

@@ -152,6 +152,13 @@ class MoreScreen extends ConsumerWidget {
           // ── Organization Management ──
           const _SectionHeader(title: 'ORGANIZATION MANAGEMENT'),
           _MenuItem(
+            icon: Icons.admin_panel_settings_rounded,
+            iconColor: const Color(0xFFD97706),
+            title: 'Owner Dashboard & Permissions',
+            subtitle: 'Manage members, roles, permissions & approvals',
+            onTap: () => context.push(AppRoutes.ownerDashboard),
+          ),
+          _MenuItem(
             icon: Icons.language_rounded,
             title: 'Public Transparency Page',
             subtitle: 'Share live public tally & verified receipts link',

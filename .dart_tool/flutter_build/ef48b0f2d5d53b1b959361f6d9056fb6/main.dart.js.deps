@@ -1259,8 +1259,10 @@ file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/presentat
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/presentation/screens/join_org_screen.dart
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/presentation/screens/members_screen.dart
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/presentation/screens/org_switcher_screen.dart
+file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/presentation/screens/owner_dashboard_screen.dart
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/presentation/widgets/member_lifecycle_tab.dart
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/providers/org_providers.dart
+file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/providers/permissions_provider.dart
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/organization/providers/season_providers.dart
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/reports/presentation/screens/reports_screen.dart
 file:///C:/Users/kadig/OneDrive/Desktop/book/lib/features/reports/presentation/widgets/multi_year_comparison_tab.dart

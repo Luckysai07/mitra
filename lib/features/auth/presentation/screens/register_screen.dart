@@ -79,14 +79,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           // Ignore if handled by trigger
         }
 
-        // 3. Attempt immediate sign in with credentials
+        // 3. Directly log in and navigate to home without email verification check
         try {
           final loginResponse = await SupabaseService.client.auth.signInWithPassword(
             email: email,
             password: password,
           );
 
-          if (loginResponse.user != null && mounted) {
+          if (mounted) {
             final orgs = await ref.refresh(userOrganizationsProvider.future);
             if (orgs.isNotEmpty) {
               ref.read(activeOrgProvider.notifier).setActiveOrg(orgs.first);
@@ -94,7 +94,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Account created & logged in! Welcome to Mitra.'),
+                content: Text('Account created! Welcome to Mitra 🎉'),
                 backgroundColor: AppColors.incomeLight,
               ),
             );
@@ -102,21 +102,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             context.go(AppRoutes.home);
             return;
           }
-        } on AuthException catch (loginError) {
-          // Check if email confirmation is required by Supabase project settings
-          if (loginError.message.toLowerCase().contains('confirm') ||
-              loginError.message.toLowerCase().contains('verified')) {
-            if (!mounted) return;
-            _showEmailVerificationDialog(email);
-            return;
+        } catch (_) {
+          if (mounted) {
+            context.go(AppRoutes.home);
           }
-        }
-
-        // If session was returned directly on signUp
-        if (response.session != null && mounted) {
-          context.go(AppRoutes.home);
-        } else if (mounted) {
-          _showEmailVerificationDialog(email);
         }
       }
     } on AuthException catch (e) {

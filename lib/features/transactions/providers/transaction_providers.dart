@@ -15,6 +15,10 @@ class TransactionModel {
   final String? personName;
   final String? personContact;
   final String paymentMethod; // 'cash', 'upi', 'bank', 'cheque'
+  final String approvalStatus; // 'approved', 'pending', 'rejected'
+  final String? approvedBy;
+  final DateTime? approvedAt;
+  final String? rejectionReason;
   final String? notes;
   final String createdBy;
   final DateTime createdAt;
@@ -31,6 +35,10 @@ class TransactionModel {
     this.personName,
     this.personContact,
     required this.paymentMethod,
+    this.approvalStatus = 'approved',
+    this.approvedBy,
+    this.approvedAt,
+    this.rejectionReason,
     this.notes,
     required this.createdBy,
     required this.createdAt,
@@ -49,6 +57,10 @@ class TransactionModel {
       personName: map['person_name'] as String?,
       personContact: map['person_contact'] as String?,
       paymentMethod: map['payment_method'] ?? 'cash',
+      approvalStatus: map['approval_status'] as String? ?? 'approved',
+      approvedBy: map['approved_by'] as String?,
+      approvedAt: map['approved_at'] != null ? DateTime.parse(map['approved_at']) : null,
+      rejectionReason: map['rejection_reason'] as String?,
       notes: map['notes'] as String?,
       createdBy: map['created_by'] as String? ?? '',
       createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
@@ -56,7 +68,7 @@ class TransactionModel {
   }
 }
 
-/// Provider for transactions of the currently active organization.
+/// Provider for all transactions of the currently active organization.
 final orgTransactionsProvider = FutureProvider<List<TransactionModel>>((ref) async {
   final activeOrg = ref.watch(activeOrgProvider);
   if (activeOrg == null) return [];
@@ -73,3 +85,16 @@ final orgTransactionsProvider = FutureProvider<List<TransactionModel>>((ref) asy
     return [];
   }
 });
+
+/// Provider for ONLY APPROVED transactions (for ledger totals and dashboard calculations).
+final approvedTransactionsProvider = FutureProvider<List<TransactionModel>>((ref) async {
+  final txns = await ref.watch(orgTransactionsProvider.future);
+  return txns.where((t) => t.approvalStatus == 'approved').toList();
+});
+
+/// Provider for ONLY PENDING transactions.
+final pendingTransactionsProvider = FutureProvider<List<TransactionModel>>((ref) async {
+  final txns = await ref.watch(orgTransactionsProvider.future);
+  return txns.where((t) => t.approvalStatus == 'pending').toList();
+});
+
