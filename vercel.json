@@ -1,8 +1,23 @@
 {
   "outputDirectory": "public",
+  "headers": [
+    {
+      "source": "/(.*).apk",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
-      "source": "/((?!download-apk).*)",
+      "source": "/((?!download-apk|.*\\.apk).*)",
       "destination": "/index.html"
     }
   ],
