@@ -1,0 +1,16 @@
+{
+  "outputDirectory": "build/web",
+  "routes": [
+    {
+      "src": "/landing",
+      "dest": "/landing.html"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
