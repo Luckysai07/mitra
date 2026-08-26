@@ -9,14 +9,28 @@ void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock to portrait on mobile
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Catch any unhandled Flutter framework errors
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter Error: ${details.exception}');
+  };
 
-  // Initialize Supabase
-  await SupabaseService.initialize();
+  // Lock to portrait on mobile safely
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } catch (e) {
+    debugPrint('Orientation setup warning: $e');
+  }
+
+  // Initialize Supabase with error safety
+  try {
+    await SupabaseService.initialize();
+  } catch (e, stack) {
+    debugPrint('Supabase initialization error: $e\n$stack');
+  }
 
   // Run the app with Riverpod
   runApp(
