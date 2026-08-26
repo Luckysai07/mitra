@@ -114,6 +114,7 @@ class _CreateOrgScreenState extends ConsumerState<CreateOrgScreen> {
       final memberPayload = <String, dynamic>{
         'org_id': orgId,
         'user_id': user.id,
+        'role': 'owner',
         'status': 'active',
         'joined_at': DateTime.now().toIso8601String(),
       };

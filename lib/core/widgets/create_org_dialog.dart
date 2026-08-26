@@ -123,6 +123,7 @@ class _CreateOrgDialogState extends ConsumerState<CreateOrgDialog> {
       final memberMap = <String, dynamic>{
         'org_id': orgId,
         'user_id': user.id,
+        'role': 'owner',
         'status': 'active',
         'joined_at': DateTime.now().toIso8601String(),
       };

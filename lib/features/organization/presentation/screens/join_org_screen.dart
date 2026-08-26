@@ -137,6 +137,7 @@ class _JoinOrgScreenState extends ConsumerState<JoinOrgScreen> {
       final joinPayload = <String, dynamic>{
         'org_id': org.id,
         'user_id': user.id,
+        'role': _selectedPositionRole,
         'status': 'active',
         'joined_at': DateTime.now().toIso8601String(),
       };
