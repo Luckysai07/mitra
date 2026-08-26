@@ -1,10 +1,6 @@
 {
-  "outputDirectory": "build/web",
+  "outputDirectory": "public",
   "routes": [
-    {
-      "src": "/landing",
-      "dest": "/landing.html"
-    },
     {
       "handle": "filesystem"
     },
