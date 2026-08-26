@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../services/supabase_service.dart';
+import '../../../organization/providers/org_providers.dart';
+import '../../../organization/providers/season_providers.dart';
 
-/// Target fundraising goal provider (in paise). Default ₹5,00,000 = 50000000 paise.
-final fundraisingGoalProvider = StateProvider<int>((ref) => 50000000);
-
+/// Target fundraising goal meter.
+/// Reads and persists real target budget values for the active festival edition (defaults to ₹0 until set).
 class FundraisingGoalWidget extends ConsumerWidget {
   final int totalRaisedPaise;
 
@@ -18,9 +22,14 @@ class FundraisingGoalWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final goalPaise = ref.watch(fundraisingGoalProvider);
-    final percentage = (goalPaise > 0 ? (totalRaisedPaise / goalPaise) : 0.0).clamp(0.0, 1.0);
-    final percentDisplay = (percentage * 100).toStringAsFixed(1);
+    final activeOrg = ref.watch(activeOrgProvider);
+    final activeSeason = ref.watch(activeSeasonProvider);
+    final goalPaise = activeSeason?.targetBudgetPaise ?? 0;
+    final selectedYear = activeSeason?.seasonYear ?? 2026;
+
+    final isGoalSet = goalPaise > 0;
+    final percentage = isGoalSet ? (totalRaisedPaise / goalPaise).clamp(0.0, 1.0) : 0.0;
+    final percentDisplay = isGoalSet ? '${(percentage * 100).toStringAsFixed(1)}%' : 'Not Set';
 
     return Card(
       elevation: 3,
@@ -57,7 +66,7 @@ class FundraisingGoalWidget extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'TARGET FUND GOAL',
+                          '$selectedYear TARGET FUND GOAL',
                           style: AppTypography.labelSmall.copyWith(
                             color: const Color(0xFF94A3B8),
                             fontWeight: FontWeight.bold,
@@ -65,9 +74,9 @@ class FundraisingGoalWidget extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          '$percentDisplay% Completed',
+                          isGoalSet ? '$percentDisplay Completed' : 'Tap ✏️ to set your goal',
                           style: AppTypography.titleSmall.copyWith(
-                            color: const Color(0xFF10B981),
+                            color: isGoalSet ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -76,9 +85,9 @@ class FundraisingGoalWidget extends ConsumerWidget {
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.edit_note_rounded, color: Colors.white70),
-                  tooltip: 'Edit Target Goal',
-                  onPressed: () => _showEditGoalDialog(context, ref, goalPaise),
+                  icon: const Icon(Icons.edit_note_rounded, color: Colors.amberAccent, size: 26),
+                  tooltip: 'Edit $selectedYear Target Goal',
+                  onPressed: () => _showEditGoalDialog(context, ref, activeOrg, activeSeason, goalPaise, selectedYear),
                 ),
               ],
             ),
@@ -91,7 +100,9 @@ class FundraisingGoalWidget extends ConsumerWidget {
                 value: percentage,
                 minHeight: 12,
                 backgroundColor: const Color(0xFF334155),
-                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isGoalSet ? const Color(0xFF10B981) : const Color(0xFF64748B),
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -111,16 +122,29 @@ class FundraisingGoalWidget extends ConsumerWidget {
                     ),
                   ],
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Target Goal', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                    const SizedBox(height: 2),
-                    Text(
-                      CurrencyFormatter.formatPaise(goalPaise),
-                      style: const TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ],
+                GestureDetector(
+                  onTap: () => _showEditGoalDialog(context, ref, activeOrg, activeSeason, goalPaise, selectedYear),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const Row(
+                        children: [
+                          Text('Target Goal', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                          SizedBox(width: 4),
+                          Icon(Icons.edit_outlined, color: Colors.amberAccent, size: 12),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isGoalSet ? CurrencyFormatter.formatPaise(goalPaise) : '₹0 (Set Goal)',
+                        style: TextStyle(
+                          color: isGoalSet ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -130,22 +154,49 @@ class FundraisingGoalWidget extends ConsumerWidget {
     );
   }
 
-  void _showEditGoalDialog(BuildContext context, WidgetRef ref, int currentGoalPaise) {
+  void _showEditGoalDialog(
+    BuildContext context,
+    WidgetRef ref,
+    OrganizationModel? activeOrg,
+    FestivalSeasonModel? activeSeason,
+    int currentGoalPaise,
+    int selectedYear,
+  ) {
     final controller = TextEditingController(
-      text: (currentGoalPaise / 100).toStringAsFixed(0),
+      text: currentGoalPaise > 0 ? (currentGoalPaise / 100).toStringAsFixed(0) : '',
     );
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Set Fundraising Target Goal'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Target Goal Amount (₹)',
-            prefixText: '₹ ',
-          ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.track_changes_rounded, color: Color(0xFFF59E0B)),
+            const SizedBox(width: 8),
+            Text('Set $selectedYear Target Goal'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Enter the total fundraising / budget target for the $selectedYear festival edition.',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Target Goal Amount (₹)',
+                hintText: 'e.g. 150000 or 50000',
+                prefixText: '₹ ',
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -153,13 +204,65 @@ class FundraisingGoalWidget extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              final rupees = double.tryParse(controller.text.trim());
-              if (rupees != null && rupees > 0) {
-                ref.read(fundraisingGoalProvider.notifier).state = (rupees * 100).round();
+            onPressed: () async {
+              HapticFeedback.mediumImpact();
+              final inputRupees = double.tryParse(controller.text.trim()) ?? 0;
+              final newGoalPaise = (inputRupees * 100).round();
+
+              // 1. Immediately update in-memory state
+              ref.read(activeSeasonProvider.notifier).updateTargetGoal(newGoalPaise);
+              if (activeSeason != null) {
+                final updated = activeSeason.copyWith(targetBudgetPaise: newGoalPaise);
+                ref.read(activeSeasonProvider.notifier).setActiveSeason(updated);
               }
-              Navigator.pop(ctx);
+
+              // 2. Persist to local SharedPreferences immediately (infallible client storage)
+              if (activeOrg != null) {
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setInt('target_goal_${activeOrg.id}_$selectedYear', newGoalPaise);
+                } catch (_) {}
+
+                // 3. Persist to Supabase Database
+                try {
+                  await SupabaseService.client.from('festival_periods').upsert({
+                    'org_id': activeOrg.id,
+                    'season_year': selectedYear,
+                    'name': activeSeason?.name ?? '${activeOrg.name} $selectedYear',
+                    'target_budget_paise': newGoalPaise,
+                    'status': 'active',
+                  });
+                } catch (_) {
+                  try {
+                    await SupabaseService.client
+                        .from('festival_periods')
+                        .update({'target_budget_paise': newGoalPaise})
+                        .eq('org_id', activeOrg.id);
+                  } catch (_) {}
+                }
+
+                // Invalidate provider so cache updates
+                ref.invalidate(orgSeasonsProvider);
+              }
+
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      newGoalPaise > 0
+                          ? 'Target goal updated to ${CurrencyFormatter.formatPaise(newGoalPaise)} for $selectedYear!'
+                          : 'Target goal reset to ₹0.',
+                    ),
+                    backgroundColor: const Color(0xFF059669),
+                  ),
+                );
+              }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Save Target'),
           ),
         ],

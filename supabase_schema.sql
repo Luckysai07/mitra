@@ -111,15 +111,42 @@ CREATE TABLE IF NOT EXISTS public.festival_periods (
     id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id                UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     name                  TEXT NOT NULL,
+    season_year           INT NOT NULL DEFAULT 2026,
     start_date            DATE NOT NULL DEFAULT CURRENT_DATE,
     end_date              DATE,
     opening_balance_paise BIGINT NOT NULL DEFAULT 0,
-    status                TEXT NOT NULL DEFAULT 'active',
+    target_budget_paise   BIGINT NOT NULL DEFAULT 0,
+    status                TEXT NOT NULL DEFAULT 'active', -- 'active', 'closed', 'upcoming'
     closed_at             TIMESTAMPTZ,
     closed_by             UUID REFERENCES public.users(id),
     closing_report_url    TEXT,
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(org_id, season_year)
 );
+
+-- Ensure columns exist even if table was created in an earlier migration
+ALTER TABLE public.festival_periods ADD COLUMN IF NOT EXISTS season_year INT NOT NULL DEFAULT 2026;
+ALTER TABLE public.festival_periods ADD COLUMN IF NOT EXISTS target_budget_paise BIGINT NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS public.member_season_dues (
+    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id                UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    user_id               UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    season_year           INT NOT NULL DEFAULT 2026,
+    fee_amount_paise      BIGINT NOT NULL DEFAULT 0,
+    is_paid               BOOLEAN NOT NULL DEFAULT false,
+    paid_at               TIMESTAMPTZ,
+    payment_method        TEXT DEFAULT 'cash',
+    notes                 TEXT,
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(org_id, user_id, season_year)
+);
+
+ALTER TABLE public.member_season_dues ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "member_dues_select" ON public.member_season_dues FOR SELECT USING (true);
+CREATE POLICY "member_dues_insert" ON public.member_season_dues FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "member_dues_update" ON public.member_season_dues FOR UPDATE USING (auth.role() = 'authenticated');
+CREATE POLICY "member_dues_delete" ON public.member_season_dues FOR DELETE USING (auth.role() = 'authenticated');
 
 -- 7. FINANCIAL ACCOUNTS
 CREATE TABLE IF NOT EXISTS public.financial_accounts (

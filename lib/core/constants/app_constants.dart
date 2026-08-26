@@ -12,6 +12,11 @@ abstract final class AppConstants {
   static const String developerLinkedinUrl = 'https://www.linkedin.com/in/k-sai-kumar-5a5a85338';
   static const String developerEmail = 'saikumarkadega@gmail.com';
   static const String copyrightNotice = '© 2026 Kadega Sai Kumar. All rights reserved.';
+  static const String appVersion = '1.0.0';
+  static const String githubRepo = 'Luckysai07/mitra';
+  static const String githubReleasesApiUrl = 'https://api.github.com/repos/Luckysai07/mitra/releases/latest';
+  static const String apkDownloadUrl = 'https://github.com/Luckysai07/mitra/releases/latest/download/app-release.apk';
+  static const String vercelDownloadUrl = 'https://mitra-alpha.vercel.app/download-apk';
 
   // ── Supabase ──
   static const String supabaseUrl = 'https://lrfxmicmalgglnbadcfh.supabase.co';

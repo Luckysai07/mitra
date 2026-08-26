@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/widgets/app_update_dialog.dart';
 import '../../../../core/widgets/create_org_dialog.dart';
 import '../../../../core/widgets/festive_3d_theme_showcase.dart';
 import '../../../../core/widgets/profile_edit_dialog.dart';
@@ -15,8 +16,10 @@ import '../../../../core/widgets/voice_assistant_dialog.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/whatsapp_share_service.dart';
 import 'package:mitra/features/organization/providers/org_providers.dart';
+import 'package:mitra/features/organization/providers/season_providers.dart';
 import 'package:mitra/features/transactions/providers/transaction_providers.dart';
 import '../widgets/fundraising_goal_widget.dart';
+import '../widgets/season_selector_bar.dart';
 
 /// Vibrant, 3D Animated Dashboard Screen with Top-Right Menu/Members/Receipts actions,
 /// modal Create Org popup, real Supabase transaction metrics, and live Ledger Feed.
@@ -42,6 +45,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
     _scaleAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Auto-check for updates when opening the dashboard
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppUpdateDialog.checkAndShow(context);
+      }
+    });
   }
 
   @override
@@ -227,6 +237,81 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                     ),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.xl),
+
+                // ── Your Organizations History (Auto-load & Quick Open) ──
+                Consumer(
+                  builder: (context, ref, _) {
+                    final userOrgsAsync = ref.watch(userOrganizationsProvider);
+
+                    return userOrgsAsync.when(
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (_, __) => const SizedBox.shrink(),
+                      data: (orgs) {
+                        if (orgs.isEmpty) return const SizedBox.shrink();
+
+                        // Auto-select first org if available
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (ref.read(activeOrgProvider) == null) {
+                            ref.read(activeOrgProvider.notifier).setActiveOrg(orgs.first);
+                          }
+                        });
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  '🏛️ Your Organizations History',
+                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E293B)),
+                                ),
+                                Text(
+                                  '${orgs.length} Available',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ...orgs.map((org) => Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: const Color(0xFFEEF2FF),
+                                  child: Text(
+                                    org.name.isNotEmpty ? org.name[0].toUpperCase() : 'O',
+                                    style: const TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                title: Text(org.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                subtitle: Text('Code: ${org.joinCode} • ${org.orgType.toUpperCase()}'),
+                                trailing: ElevatedButton(
+                                  onPressed: () {
+                                    ref.read(activeOrgProvider.notifier).setActiveOrg(org);
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF4F46E5),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  child: const Text('Open'),
+                                ),
+                              ),
+                            )),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                ),
               ] else ...[
                 // ── Active Org Card ──
                 Container(
@@ -328,9 +413,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.xxl),
+              const SizedBox(height: AppSpacing.md),
 
-              // ── 2. Net Organization Balance Card ──
+              // ── 2. Yearly Season / Festival Edition Switcher ──
+              const SeasonSelectorBar(),
+              const SizedBox(height: AppSpacing.md),
+
+              // ── 3. Net Organization Balance Card ──
               txnsAsync.when(
                 loading: () => const Center(
                   child: Padding(
@@ -345,11 +434,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                     child: Text('Error loading financial ledger: ${err.toString()}'),
                   ),
                 ),
-                data: (txns) {
+                data: (_) {
+                  final activeSeason = ref.watch(activeSeasonProvider);
+                  final seasonTxns = ref.watch(activeSeasonTransactionsProvider);
+
                   int totalIncomePaise = 0;
                   int totalExpensePaise = 0;
 
-                  for (final t in txns) {
+                  for (final t in seasonTxns) {
                     if (t.type == 'income') {
                       totalIncomePaise += t.amountPaise;
                     } else {
@@ -357,7 +449,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                     }
                   }
 
-                  final netBalancePaise = totalIncomePaise - totalExpensePaise;
+                  final openingBalancePaise = activeSeason?.openingBalancePaise ?? 0;
+                  final netBalancePaise = openingBalancePaise + totalIncomePaise - totalExpensePaise;
+                  final displayYear = activeSeason?.seasonYear ?? 2026;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,13 +477,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  'NET ORGANIZATION BALANCE',
-                                  style: AppTypography.labelSmall.copyWith(
-                                    color: const Color(0xFF475569),
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.1,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '$displayYear NET BALANCE',
+                                      style: AppTypography.labelSmall.copyWith(
+                                        color: const Color(0xFF475569),
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.1,
+                                      ),
+                                    ),
+                                    if (activeSeason?.isClosed ?? false) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFEF3C7),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text(
+                                          'ARCHIVED',
+                                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -398,7 +510,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    '${txns.length} Entries',
+                                    '${seasonTxns.length} Entries',
                                     style: const TextStyle(
                                       color: Color(0xFF4F46E5),
                                       fontWeight: FontWeight.bold,
@@ -408,6 +520,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                                 ),
                               ],
                             ),
+                            if (openingBalancePaise > 0) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Includes ${CurrencyFormatter.formatPaise(openingBalancePaise)} opening carryover',
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600),
+                              ),
+                            ],
                             const SizedBox(height: AppSpacing.sm),
                             Text(
                               CurrencyFormatter.formatPaise(netBalancePaise),
@@ -537,11 +656,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
               ),
               const SizedBox(height: AppSpacing.xs),
 
-              txnsAsync.when(
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-                data: (txns) {
-                  if (txns.isEmpty) {
+              Builder(
+                builder: (context) {
+                  final seasonTxns = ref.watch(activeSeasonTransactionsProvider);
+                  if (seasonTxns.isEmpty) {
                     return Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
@@ -554,14 +672,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                         children: [
                           Icon(Icons.menu_book_rounded, color: Color(0xFF94A3B8), size: 36),
                           SizedBox(height: 8),
-                          Text('No transactions recorded yet.', style: TextStyle(color: Color(0xFF64748B))),
+                          Text('No transactions recorded for this year yet.', style: TextStyle(color: Color(0xFF64748B))),
                           Text('Tap + Money In or - Money Out to add entries', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
                         ],
                       ),
                     );
                   }
 
-                  final recentList = txns.take(5).toList();
+                  final recentList = seasonTxns.take(5).toList();
 
                   return Column(
                     children: recentList.map((t) {

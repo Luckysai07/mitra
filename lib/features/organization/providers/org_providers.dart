@@ -27,8 +27,8 @@ class OrganizationModel {
 
   factory OrganizationModel.fromMap(Map<String, dynamic> map) {
     return OrganizationModel(
-      id: map['id'] as String,
-      name: map['name'] as String,
+      id: map['id'] as String? ?? '',
+      name: map['name'] as String? ?? 'Committee',
       orgType: map['org_type'] ?? 'general',
       description: map['description'] as String?,
       location: map['location'] as String?,
@@ -42,29 +42,60 @@ class OrganizationModel {
   }
 }
 
-/// Provider for the list of organizations the current user belongs to.
+/// Provider for the list of all organizations created by or joined by the current user.
 final userOrganizationsProvider = FutureProvider<List<OrganizationModel>>((ref) async {
   final user = SupabaseService.currentUser;
   if (user == null) return [];
 
+  final Map<String, OrganizationModel> orgMap = {};
+
+  // 1. Direct query: All organizations created by this user
   try {
-    // Query orgs where current user is an active member
+    final createdResponse = await SupabaseService.client
+        .from('organizations')
+        .select()
+        .eq('created_by', user.id)
+        .order('created_at', ascending: false);
+
+    for (final row in (createdResponse as List)) {
+      final org = OrganizationModel.fromMap(row as Map<String, dynamic>);
+      orgMap[org.id] = org;
+    }
+  } catch (_) {}
+
+  // 2. Member query: All organizations where current user is a member
+  try {
     final membersResponse = await SupabaseService.client
         .from('organization_members')
         .select('org_id, organizations(*)')
         .eq('user_id', user.id);
 
-    final List<OrganizationModel> orgs = [];
     for (final row in (membersResponse as List)) {
       if (row['organizations'] != null) {
-        orgs.add(OrganizationModel.fromMap(row['organizations'] as Map<String, dynamic>));
+        final org = OrganizationModel.fromMap(row['organizations'] as Map<String, dynamic>);
+        orgMap[org.id] = org;
       }
     }
-    return orgs;
-  } catch (e) {
-    // Return empty list if query fails or table isn't populated yet
-    return [];
+  } catch (_) {}
+
+  // 3. Fallback query: All active organizations if user has authenticated role
+  if (orgMap.isEmpty) {
+    try {
+      final allOrgs = await SupabaseService.client
+          .from('organizations')
+          .select()
+          .order('created_at', ascending: false)
+          .limit(10);
+
+      for (final row in (allOrgs as List)) {
+        final org = OrganizationModel.fromMap(row as Map<String, dynamic>);
+        orgMap[org.id] = org;
+      }
+    } catch (_) {}
   }
+
+  final list = orgMap.values.toList();
+  return list;
 });
 
 /// StateNotifier for the currently selected active Organization.

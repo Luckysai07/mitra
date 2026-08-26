@@ -9,6 +9,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../services/supabase_service.dart';
 import 'package:mitra/features/organization/providers/org_providers.dart';
 
+import '../widgets/member_lifecycle_tab.dart';
+
 class MemberItem {
   final String id;
   final String name;
@@ -27,7 +29,7 @@ class MemberItem {
   });
 }
 
-/// Member List & Role Management Screen connected to Supabase.
+/// Member List, Multi-Year Movement & Dues Screen connected to Supabase.
 class MembersScreen extends ConsumerWidget {
   const MembersScreen({super.key});
 
@@ -63,39 +65,60 @@ class MembersScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final activeOrg = ref.watch(activeOrgProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: () => context.pop()),
-        title: Text(activeOrg != null ? '${activeOrg.name} Members' : 'Organization Members'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: 'Share Invite Code',
-            onPressed: () {
-              if (activeOrg != null) {
-                Clipboard.setData(ClipboardData(text: activeOrg.joinCode));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Invite Code "${activeOrg.joinCode}" copied to clipboard!'),
-                    backgroundColor: AppColors.incomeLight,
-                  ),
-                );
-              }
-            },
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: () => context.pop()),
+          title: Text(activeOrg != null ? '${activeOrg.name} Team' : 'Team & Movement'),
+          bottom: const TabBar(
+            indicatorColor: Color(0xFF059669),
+            labelColor: Color(0xFF059669),
+            unselectedLabelColor: Color(0xFF64748B),
+            labelStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            tabs: [
+              Tab(
+                icon: Icon(Icons.people_alt_rounded, size: 18),
+                text: 'Member Directory',
+              ),
+              Tab(
+                icon: Icon(Icons.compare_arrows_rounded, size: 18),
+                text: 'Yearly Roster & Dues 📋',
+              ),
+            ],
           ),
-        ],
-      ),
-      body: SafeArea(
-        child: activeOrg == null
-            ? const Center(child: Text('No active organization selected.'))
-            : FutureBuilder<List<MemberItem>>(
-                future: _fetchMembers(activeOrg.id),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.share_rounded),
+              tooltip: 'Share Invite Code',
+              onPressed: () {
+                if (activeOrg != null) {
+                  Clipboard.setData(ClipboardData(text: activeOrg.joinCode));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Invite Code "${activeOrg.joinCode}" copied to clipboard!'),
+                      backgroundColor: AppColors.incomeLight,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        body: TabBarView(
+          children: [
+            // ── Tab 1: Member Directory ──
+            SafeArea(
+              child: activeOrg == null
+                  ? const Center(child: Text('No active organization selected.'))
+                  : FutureBuilder<List<MemberItem>>(
+                      future: _fetchMembers(activeOrg.id),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
 
-                  final members = snapshot.data ?? [];
+                        final members = snapshot.data ?? [];
 
                   return ListView(
                     padding: const EdgeInsets.all(AppSpacing.lg),
@@ -237,6 +260,12 @@ class MembersScreen extends ConsumerWidget {
                   );
                 },
               ),
+            ),
+
+            // ── Tab 2: Member Lifecycle & Annual Dues Tracker ──
+            const MemberLifecycleTab(),
+          ],
+        ),
       ),
     );
   }

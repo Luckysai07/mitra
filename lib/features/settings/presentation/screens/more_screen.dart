@@ -7,6 +7,7 @@ import '../../../../core/routing/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_update_dialog.dart';
 import '../../../../core/widgets/developer_about_dialog.dart';
 import '../../../../core/widgets/profile_edit_dialog.dart';
 import '../../../../services/supabase_service.dart';
@@ -207,6 +208,13 @@ class MoreScreen extends ConsumerWidget {
             icon: Icons.person_outline_rounded,
             title: 'Edit Profile & Mobile Number',
             onTap: () => ProfileEditDialog.show(context),
+          ),
+          _MenuItem(
+            icon: Icons.system_update_rounded,
+            title: 'Check for Updates',
+            subtitle: 'Get latest features & APK download',
+            iconColor: const Color(0xFF10B981),
+            onTap: () => AppUpdateDialog.checkAndShow(context, showToastIfUpToDate: true),
           ),
           _MenuItem(
             icon: Icons.info_outline_rounded,
