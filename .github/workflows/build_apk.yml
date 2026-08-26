@@ -63,4 +63,5 @@ jobs:
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/mitra-app.apk
           make_latest: true
+          overwrite: true
           prerelease: false

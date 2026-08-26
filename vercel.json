@@ -9,7 +9,7 @@
   "redirects": [
     {
       "source": "/download-apk",
-      "destination": "https://github.com/Luckysai07/mitra/releases/latest/download/app-release.apk",
+      "destination": "https://github.com/Luckysai07/mitra/releases/download/latest/mitra-app.apk",
       "statusCode": 302
     }
   ]
