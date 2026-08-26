@@ -128,11 +128,22 @@ class AppUpdateService {
 
   /// Launches APK download link in external browser to trigger immediate mobile install.
   static Future<bool> launchDownload(String url) async {
-    final targetUri = Uri.parse(url.isNotEmpty ? url : AppConstants.vercelDownloadUrl);
+    final downloadUrlStr = url.isNotEmpty ? url : AppConstants.apkDownloadUrl;
+    final targetUri = Uri.parse(downloadUrlStr);
+
+    try {
+      final launched = await launchUrl(
+        targetUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched) return true;
+    } catch (_) {}
+
+    // Fallback mode for web and browsers that restrict direct application launch
     try {
       return await launchUrl(
         targetUri,
-        mode: LaunchMode.externalApplication,
+        mode: LaunchMode.platformDefault,
       );
     } catch (e) {
       debugPrint('Launch download error: $e');

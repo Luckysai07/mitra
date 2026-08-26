@@ -15,8 +15,8 @@ abstract final class AppConstants {
   static const String appVersion = '1.0.0';
   static const String githubRepo = 'Luckysai07/mitra';
   static const String githubReleasesApiUrl = 'https://api.github.com/repos/Luckysai07/mitra/releases/latest';
-  static const String apkDownloadUrl = 'https://github.com/Luckysai07/mitra/releases/latest/download/app-release.apk';
-  static const String vercelDownloadUrl = 'https://mitra-alpha.vercel.app/download-apk';
+  static const String apkDownloadUrl = 'https://github.com/Luckysai07/mitra/releases/download/latest/mitra-app.apk';
+  static const String vercelDownloadUrl = 'https://github.com/Luckysai07/mitra/releases/download/latest/mitra-app.apk';
 
   // ── Supabase ──
   static const String supabaseUrl = 'https://lrfxmicmalgglnbadcfh.supabase.co';
