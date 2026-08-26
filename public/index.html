@@ -339,11 +339,28 @@
       <p>Manage committee finances, track festival budgets, issue official WhatsApp digital receipts, and maintain real-time transparent accounts for your organization.</p>
 
       <div class="cta-group">
-        <a href="https://github.com/Luckysai07/mitra/releases/latest/download/app-release.apk" class="btn btn-primary" target="_blank">
+        <a href="/download-apk" class="btn btn-primary" id="download-btn" onclick="handleDownload(event)">
           <span>📱</span> Download Android APK
         </a>
       </div>
+
+      <!-- Download status message -->
+      <p id="download-status" style="display:none; color:#34D399; font-size:0.9rem; margin-top:-1.5rem; margin-bottom:1rem;">
+        ⬇️ Download started! Check your notifications bar. If nothing happened, 
+        <a href="https://github.com/Luckysai07/mitra/releases/latest" target="_blank" style="color:#38BDF8; text-decoration:underline;">tap here to download from GitHub</a>.
+      </p>
     </section>
+
+    <script>
+      function handleDownload(e) {
+        e.preventDefault();
+        var statusEl = document.getElementById('download-status');
+        statusEl.style.display = 'block';
+        
+        // Trigger download via navigation (works best on mobile)
+        window.location.href = '/download-apk';
+      }
+    </script>
 
     <!-- Features Grid -->
     <h2 class="features-title">Core Features & Capabilities</h2>
