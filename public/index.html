@@ -339,17 +339,17 @@
       <p>Manage committee finances, track festival budgets, issue official WhatsApp digital receipts, and maintain real-time transparent accounts for your organization.</p>
 
       <div class="cta-group">
-        <a href="https://github.com/Luckysai07/mitra/releases/download/latest/mitra-app.apk" download="mitra-app.apk" class="btn btn-primary" id="download-btn" onclick="handleDownload(event)">
+        <a href="https://github.com/Luckysai07/mitra/releases/download/latest/mitra-app.apk" target="_blank" rel="noopener noreferrer" class="btn btn-primary" id="download-btn" onclick="handleDownload(event)">
           <span>📱</span> Download Android APK
         </a>
-        <a href="https://github.com/Luckysai07/mitra/releases/latest" target="_blank" class="btn" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
+        <a href="https://github.com/Luckysai07/mitra/releases/latest" target="_blank" rel="noopener noreferrer" class="btn" style="background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
           <span>📦</span> View Releases on GitHub
         </a>
       </div>
 
       <!-- Download status message -->
       <p id="download-status" style="display:none; color:#34D399; font-size:0.9rem; margin-top:-1.5rem; margin-bottom:1rem;">
-        ⬇️ APK download started! Check your notification bar. If prompted by Chrome, tap <strong>"Download anyway"</strong>.
+        ⬇️ APK download started! Check your phone's notification bar / Downloads folder.
       </p>
     </section>
 
@@ -357,6 +357,23 @@
       function handleDownload(e) {
         var statusEl = document.getElementById('download-status');
         if (statusEl) statusEl.style.display = 'block';
+
+        var apkUrl = 'https://github.com/Luckysai07/mitra/releases/download/latest/mitra-app.apk';
+
+        // Trigger direct binary download via background iframe to prevent page navigation
+        try {
+          var iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = apkUrl;
+          document.body.appendChild(iframe);
+          setTimeout(function() {
+            if (iframe && iframe.parentNode) {
+              iframe.parentNode.removeChild(iframe);
+            }
+          }, 10000);
+        } catch (err) {
+          console.log('Download trigger:', err);
+        }
       }
     </script>
 
