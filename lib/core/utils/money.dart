@@ -49,18 +49,18 @@ class Money implements Comparable<Money> {
     return '₹${formatter.format(rupees)}';
   }
 
-  /// Compact format: ₹1.2L, ₹50K, ₹500
+  /// Compact format: ₹1.2L, ₹50.0K, ₹1.5Cr
   String get compact {
-    final abs = paise.abs();
-    if (abs >= 10000000) {
-      // ≥ 1 Crore
-      return '₹${(rupees.abs() / 10000000).toStringAsFixed(1)}Cr';
-    } else if (abs >= 100000) {
-      // ≥ 1 Lakh
-      return '₹${(rupees.abs() / 100000).toStringAsFixed(1)}L';
-    } else if (abs >= 1000) {
-      // ≥ 1 Thousand
-      return '₹${(rupees.abs() / 1000).toStringAsFixed(1)}K';
+    final r = rupees.abs();
+    if (r >= 10000000) {
+      // ≥ 1 Crore Rupees (₹1,00,00,000)
+      return '₹${(r / 10000000).toStringAsFixed(1)}Cr';
+    } else if (r >= 100000) {
+      // ≥ 1 Lakh Rupees (₹1,00,000)
+      return '₹${(r / 100000).toStringAsFixed(1)}L';
+    } else if (r >= 1000) {
+      // ≥ 1 Thousand Rupees (₹1,000)
+      return '₹${(r / 1000).toStringAsFixed(1)}K';
     }
     return formatted;
   }

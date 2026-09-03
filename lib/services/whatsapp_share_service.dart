@@ -48,7 +48,8 @@ class WhatsAppShareService {
     }
     buffer.writeln('------------------------------');
     buffer.writeln('✅ *Status:* Digitally Signed & Verified');
-    buffer.writeln('🔒 *Verify Online:* https://app.url/verify/${txn.id.substring(0, 8)}');
+    final safeId = txn.id.length >= 8 ? txn.id.substring(0, 8) : txn.id;
+    buffer.writeln('🔒 *Verify Online:* https://app.url/verify/$safeId');
     buffer.writeln('==============================');
     buffer.writeln('Thank you for your generous support & trust! 🙏');
 

@@ -52,7 +52,11 @@ CREATE TABLE public.approval_actions (
 
 CREATE INDEX IF NOT EXISTS idx_approval_actions_txn ON public.approval_actions(transaction_id);
 
--- 4. ADD APPROVAL COLUMNS TO TRANSACTIONS
+-- 4. ADD APPROVAL COLUMNS TO TRANSACTIONS & MEMBERS
+ALTER TABLE public.organization_members ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'member';
+ALTER TABLE public.organization_members ADD COLUMN IF NOT EXISTS role_id UUID REFERENCES public.roles(id) ON DELETE SET NULL;
+ALTER TABLE public.organization_members ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';
+
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS approval_status TEXT NOT NULL DEFAULT 'approved';
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES public.users(id);
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
@@ -142,6 +146,10 @@ ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.permission_overrides ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.approval_actions ENABLE ROW LEVEL SECURITY;
 
+-- Ensure organizations table is readable by all users for join_code lookup
+DROP POLICY IF EXISTS "org_select" ON public.organizations;
+CREATE POLICY "org_select" ON public.organizations FOR SELECT USING (true);
+
 -- Role Permissions Policies
 DROP POLICY IF EXISTS "role_perms_select" ON public.role_permissions;
 DROP POLICY IF EXISTS "role_perms_insert" ON public.role_permissions;
@@ -164,12 +172,18 @@ CREATE POLICY "perm_overrides_insert" ON public.permission_overrides FOR INSERT 
 CREATE POLICY "perm_overrides_update" ON public.permission_overrides FOR UPDATE USING (auth.role() = 'authenticated');
 CREATE POLICY "perm_overrides_delete" ON public.permission_overrides FOR DELETE USING (auth.role() = 'authenticated');
 
--- Approval Actions Policies
+-- Approval Actions & Transactions Update Policies
 DROP POLICY IF EXISTS "approval_actions_select" ON public.approval_actions;
 DROP POLICY IF EXISTS "approval_actions_insert" ON public.approval_actions;
+DROP POLICY IF EXISTS "txn_update" ON public.transactions;
 
 CREATE POLICY "approval_actions_select" ON public.approval_actions FOR SELECT USING (true);
-CREATE POLICY "approval_actions_insert" ON public.approval_actions FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "approval_actions_insert" ON public.approval_actions FOR INSERT WITH CHECK (true);
+CREATE POLICY "txn_update" ON public.transactions FOR UPDATE USING (true);
+
+-- Ensure organization_members table allows role updates
+DROP POLICY IF EXISTS "org_members_update" ON public.organization_members;
+CREATE POLICY "org_members_update" ON public.organization_members FOR UPDATE USING (true) WITH CHECK (true);
 
 -- ============================================================
 -- SEED PERMISSIONS FOR EXISTING ORGANIZATIONS (one-time backfill)

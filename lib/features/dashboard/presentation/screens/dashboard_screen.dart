@@ -414,10 +414,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.md),
+              if (activeOrg != null) ...[
+                const SizedBox(height: AppSpacing.md),
 
-              // ── 2. Yearly Season / Festival Edition Switcher ──
-              const SeasonSelectorBar(),
+                // ── 2. Yearly Season / Festival Edition Switcher ──
+                const SeasonSelectorBar(),
               const SizedBox(height: AppSpacing.md),
 
               // ── 3. Net Organization Balance Card ──
@@ -611,163 +612,146 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> with SingleTi
               ),
               const SizedBox(height: AppSpacing.xxl),
 
-              // ── 3. Quick Action Buttons ──
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => context.push(AppRoutes.addTransaction),
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('+ Money In'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
+                // ── 4. Quick Actions / Recent Entries Header ──
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '📋 Recent Ledger Entries',
+                      style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => context.push(AppRoutes.addTransaction),
-                      icon: const Icon(Icons.remove_rounded, size: 18),
-                      label: const Text('- Money Out'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEF4444),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
+                    TextButton.icon(
+                      onPressed: () => context.go(AppRoutes.book),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                      label: const Text('View Ledger'),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xxl),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
 
-              // ── 4. RECENT LEDGER TRANSACTIONS FEED (Below Money In / Money Out) ──
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '📒 Recent Ledger Entries',
-                    style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-                  ),
-                  TextButton(
-                    onPressed: () => context.push(AppRoutes.book),
-                    child: const Text('View All'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
+                txnsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (_, __) => const SizedBox.shrink(),
+                  data: (_) {
+                    final seasonTxns = ref.watch(activeSeasonTransactionsProvider);
 
-              Builder(
-                builder: (context) {
-                  final seasonTxns = ref.watch(activeSeasonTransactionsProvider);
-                  if (seasonTxns.isEmpty) {
-                    return Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      alignment: Alignment.center,
-                      child: const Column(
-                        children: [
-                          Icon(Icons.menu_book_rounded, color: Color(0xFF94A3B8), size: 36),
-                          SizedBox(height: 8),
-                          Text('No transactions recorded for this year yet.', style: TextStyle(color: Color(0xFF64748B))),
-                          Text('Tap + Money In or - Money Out to add entries', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                        ],
-                      ),
-                    );
-                  }
-
-                  final recentList = seasonTxns.take(5).toList();
-
-                  return Column(
-                    children: recentList.map((t) {
-                      final isIncome = t.type == 'income';
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: isIncome ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
-                            child: Icon(
-                              isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                              color: isIncome ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                              size: 18,
+                    if (seasonTxns.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(AppSpacing.xxl),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: const Column(
+                          children: [
+                            Text('📝', style: TextStyle(fontSize: 36)),
+                            SizedBox(height: 8),
+                            Text(
+                              'No ledger entries yet for this season',
+                              style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF334155)),
                             ),
-                          ),
-                          title: Text(
-                            t.description ?? (isIncome ? 'Deposit' : 'Withdrawal'),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          subtitle: Text(
-                            '${t.personName ?? 'General'} • ${t.paymentMethod.toUpperCase()}',
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                '${isIncome ? '+' : '−'}${CurrencyFormatter.formatPaise(t.amountPaise)}',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: isIncome ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF25D366)),
-                                tooltip: 'WhatsApp Receipt',
-                                onPressed: () {
-                                  if (activeOrg != null) {
-                                    WhatsAppShareService.shareReceiptOnWhatsApp(
-                                      txn: t,
-                                      org: activeOrg,
-                                      phoneNumber: t.personContact,
-                                    );
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
+                            SizedBox(height: 4),
+                            Text(
+                              'Tap "+ Voice Entry" or Add button below to record income/expense',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          ],
                         ),
                       );
-                    }).toList(),
-                  );
-                },
-              ),
-              const SizedBox(height: AppSpacing.xxl),
+                    }
 
-              // ── 5. 3D Animated Festive Showcase ──
-              Text(
-                '🪔 Festive & Event Themes 2026',
-                style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                '3D glassmorphic cards for Ganesh Utsav, Diwali, New Year & Tournaments',
-                style: AppTypography.bodySmall.copyWith(color: const Color(0xFF475569)),
-              ),
-              const SizedBox(height: AppSpacing.md),
+                    final recentTxns = seasonTxns.take(5).toList();
 
-              const Festive3DThemeShowcase(),
-              const SizedBox(height: AppSpacing.xxl),
+                    return Column(
+                      children: recentTxns.map((t) {
+                        final isIncome = t.type == 'income';
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusLg)),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: isIncome ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2),
+                              child: Icon(
+                                isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                                color: isIncome ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                              ),
+                            ),
+                            title: Text(
+                              t.description ?? (isIncome ? 'Deposit' : 'Withdrawal'),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            subtitle: Text(
+                              '${t.personName ?? 'General'} • ${t.paymentMethod.toUpperCase()}',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${isIncome ? '+' : '−'}${CurrencyFormatter.formatPaise(t.amountPaise)}',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: isIncome ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.share_rounded, size: 16, color: Color(0xFF25D366)),
+                                  tooltip: 'WhatsApp Receipt',
+                                  onPressed: () {
+                                    if (activeOrg != null) {
+                                      WhatsAppShareService.shareReceiptOnWhatsApp(
+                                        txn: t,
+                                        org: activeOrg,
+                                        phoneNumber: t.personContact,
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+
+                // ── 5. 3D Animated Festive Showcase ──
+                Text(
+                  '🪔 Festive & Event Themes 2026',
+                  style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  '3D glassmorphic cards for Ganesh Utsav, Diwali, New Year & Tournaments',
+                  style: AppTypography.bodySmall.copyWith(color: const Color(0xFF475569)),
+                ),
+                const SizedBox(height: AppSpacing.md),
+
+                const Festive3DThemeShowcase(),
+                const SizedBox(height: AppSpacing.xxl),
+              ],
             ],
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (_) => const VoiceAssistantDialog(),
-          );
-        },
-        icon: const Icon(Icons.mic_rounded, color: Colors.white),
-        label: const Text('Voice Entry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.primary,
-      ),
+      floatingActionButton: activeOrg == null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => const VoiceAssistantDialog(),
+                );
+              },
+              icon: const Icon(Icons.mic_rounded, color: Colors.white),
+              label: const Text('Voice Entry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              backgroundColor: AppColors.primary,
+            ),
     );
   }
 }

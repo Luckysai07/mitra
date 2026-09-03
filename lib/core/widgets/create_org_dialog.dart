@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,10 +59,10 @@ class _CreateOrgDialogState extends ConsumerState<CreateOrgDialog> {
 
   String _generateJoinCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final random = DateTime.now().microsecondsSinceEpoch.toString();
+    final random = Random();
     final code = StringBuffer('MTR');
     for (int i = 0; i < 5; i++) {
-      code.write(chars[int.parse(random[i % random.length]) % chars.length]);
+      code.write(chars[random.nextInt(chars.length)]);
     }
     return code.toString();
   }

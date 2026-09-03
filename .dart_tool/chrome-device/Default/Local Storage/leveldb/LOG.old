@@ -1,3 +1,12 @@
-2026/08/26-19:06:50.940 299c Reusing MANIFEST C:\Users\kadig\AppData\Local\Temp\flutter_tools.680c8987\flutter_tools_chrome_device.524c82b5\Default\Local Storage\leveldb/MANIFEST-000001
-2026/08/26-19:06:50.944 299c Recovering log #3
-2026/08/26-19:06:50.945 299c Reusing old log C:\Users\kadig\AppData\Local\Temp\flutter_tools.680c8987\flutter_tools_chrome_device.524c82b5\Default\Local Storage\leveldb/000003.log 
+2026/09/03-16:57:04.716 5bf4 Reusing MANIFEST C:\Users\kadig\AppData\Local\Temp\flutter_tools.d3bd8b51\flutter_tools_chrome_device.8add14ce\Default\Local Storage\leveldb/MANIFEST-000001
+2026/09/03-16:57:04.728 5bf4 Recovering log #15
+2026/09/03-16:57:04.731 5bf4 Reusing old log C:\Users\kadig\AppData\Local\Temp\flutter_tools.d3bd8b51\flutter_tools_chrome_device.8add14ce\Default\Local Storage\leveldb/000015.log 
+2026/09/03-16:57:04.733 5bf4 Delete type=2 #3
+2026/09/03-16:57:04.733 5bf4 Delete type=0 #3
+2026/09/03-16:57:04.733 5bf4 Delete type=0 #4
+2026/09/03-16:57:04.733 5bf4 Delete type=2 #5
+2026/09/03-16:57:04.733 5bf4 Delete type=0 #5
+2026/09/03-16:57:04.733 5bf4 Delete type=2 #6
+2026/09/03-16:57:04.733 5bf4 Delete type=0 #8
+2026/09/03-16:57:04.733 5bf4 Delete type=2 #9
+2026/09/03-16:57:04.734 5bf4 Delete type=0 #11

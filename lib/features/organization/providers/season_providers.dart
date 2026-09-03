@@ -165,15 +165,16 @@ final activeSeasonProvider = StateNotifierProvider<ActiveSeasonNotifier, Festiva
   return ActiveSeasonNotifier();
 });
 
-/// Provider for transactions filtered by the currently active/selected season year.
+/// Provider for APPROVED transactions filtered by the currently active/selected season year (for net balance computation).
 final activeSeasonTransactionsProvider = Provider<List<TransactionModel>>((ref) {
   final allTxnsAsync = ref.watch(orgTransactionsProvider);
   final activeSeason = ref.watch(activeSeasonProvider);
 
   return allTxnsAsync.when(
     data: (txns) {
-      if (activeSeason == null) return txns;
-      return txns.where((t) => t.date.year == activeSeason.seasonYear).toList();
+      final approvedTxns = txns.where((t) => t.approvalStatus == 'approved');
+      if (activeSeason == null) return approvedTxns.toList();
+      return approvedTxns.where((t) => t.date.year == activeSeason.seasonYear).toList();
     },
     loading: () => [],
     error: (_, __) => [],
@@ -205,12 +206,13 @@ class YearSummaryMetric {
   int get netSurplusPaise => totalIncomePaise - totalExpensePaise;
 }
 
-/// Provider computing Year-over-Year (YoY) comparison metrics across all available years.
+/// Provider computing Year-over-Year (YoY) comparison metrics across all available years (APPROVED ONLY).
 final multiYearComparisonProvider = Provider<List<YearSummaryMetric>>((ref) {
   final allTxnsAsync = ref.watch(orgTransactionsProvider);
   final seasonsAsync = ref.watch(orgSeasonsProvider);
 
-  final txns = allTxnsAsync.value ?? [];
+  final rawTxns = allTxnsAsync.value ?? [];
+  final txns = rawTxns.where((t) => t.approvalStatus == 'approved').toList();
   final seasons = seasonsAsync.value ?? [];
 
   // Collect distinct years

@@ -45,11 +45,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     setState(() => _isLoading = true);
 
+    final name = _nameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
     try {
-      final name = _nameController.text.trim();
-      final phone = _phoneController.text.trim();
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
 
       // 1. Register with Supabase Auth
       final response = await SupabaseService.client.auth.signUp(
@@ -110,10 +111,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     } on AuthException catch (e) {
       if (!mounted) return;
+      if (e.message.toLowerCase().contains('rate limit')) {
+        // Fallback: Try logging in directly if the account was already created
+        try {
+          final loginResponse = await SupabaseService.client.auth.signInWithPassword(
+            email: email,
+            password: password,
+          );
+          if (loginResponse.user != null) {
+            final orgs = await ref.refresh(userOrganizationsProvider.future);
+            if (orgs.isNotEmpty) {
+              ref.read(activeOrgProvider.notifier).setActiveOrg(orgs.first);
+            }
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Logged in successfully! Welcome to Mitra 🎉'),
+                  backgroundColor: AppColors.incomeLight,
+                ),
+              );
+              context.go(AppRoutes.home);
+            }
+            return;
+          }
+        } catch (_) {}
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(e.message),
+          content: Text(
+            e.message.toLowerCase().contains('rate limit')
+                ? 'Email rate limit reached. Turn OFF "Confirm Email" in Supabase Dashboard (Authentication -> Email -> Confirm email: OFF) or tap Login.'
+                : e.message,
+          ),
           backgroundColor: AppColors.errorLight,
+          duration: const Duration(seconds: 5),
         ),
       );
     } catch (e) {

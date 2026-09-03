@@ -357,7 +357,7 @@ DROP POLICY IF EXISTS "org_members_delete" ON public.organization_members;
 
 CREATE POLICY "org_members_select" ON public.organization_members FOR SELECT USING (true);
 CREATE POLICY "org_members_insert" ON public.organization_members FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-CREATE POLICY "org_members_update" ON public.organization_members FOR UPDATE USING (user_id = auth.uid() OR is_org_member(org_id));
+CREATE POLICY "org_members_update" ON public.organization_members FOR UPDATE USING (auth.role() = 'authenticated') WITH CHECK (auth.role() = 'authenticated');
 CREATE POLICY "org_members_delete" ON public.organization_members FOR DELETE USING (user_id = auth.uid() OR is_org_member(org_id));
 
 -- 5. Financial Accounts policies

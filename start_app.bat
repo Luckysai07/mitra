@@ -7,9 +7,14 @@ set "PATH=C:\Windows\System32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\Sys
 cd /d "%~dp0"
 
 echo ============================================
-echo    Launching Mitra on Chrome (Release Mode)...
+echo    Resolving packages and launching Mitra...
 echo ============================================
 echo.
+
+if exist "build" rd /s /q "build" 2>nul
+if not exist "build\web\assets\shaders" mkdir "build\web\assets\shaders" 2>nul
+
+"C:\flutter\flutter\bin\cache\dart-sdk\bin\dart.exe" "C:\flutter\flutter\bin\cache\flutter_tools.snapshot" pub get
 
 "C:\flutter\flutter\bin\cache\dart-sdk\bin\dart.exe" "C:\flutter\flutter\bin\cache\flutter_tools.snapshot" run -d chrome --release
 

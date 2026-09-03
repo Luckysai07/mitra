@@ -28,14 +28,25 @@ class SupabaseService {
   static SupabaseClient get client => Supabase.instance.client;
 
   /// Current authenticated user (nullable).
-  static User? get currentUser => client.auth.currentUser;
+  static User? get currentUser {
+    try {
+      return client.auth.currentUser;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Whether a user is currently signed in.
   static bool get isAuthenticated => currentUser != null;
 
   /// Auth state change stream.
-  static Stream<AuthState> get authStateChanges =>
-      client.auth.onAuthStateChange;
+  static Stream<AuthState> get authStateChanges {
+    try {
+      return client.auth.onAuthStateChange;
+    } catch (_) {
+      return const Stream.empty();
+    }
+  }
 }
 
 /// Riverpod provider for the Supabase client.

@@ -66,13 +66,62 @@ class TransactionModel {
       createdAt: map['created_at'] != null ? DateTime.parse(map['created_at']) : DateTime.now(),
     );
   }
+
+  TransactionModel copyWith({
+    String? approvalStatus,
+    String? approvedBy,
+    DateTime? approvedAt,
+    String? rejectionReason,
+  }) {
+    return TransactionModel(
+      id: id,
+      orgId: orgId,
+      txnNumber: txnNumber,
+      type: type,
+      amountPaise: amountPaise,
+      date: date,
+      categoryId: categoryId,
+      description: description,
+      personName: personName,
+      personContact: personContact,
+      paymentMethod: paymentMethod,
+      approvalStatus: approvalStatus ?? this.approvalStatus,
+      approvedBy: approvedBy ?? this.approvedBy,
+      approvedAt: approvedAt ?? this.approvedAt,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      notes: notes,
+      createdBy: createdBy,
+      createdAt: createdAt,
+    );
+  }
 }
 
-/// Provider for all transactions of the currently active organization.
+/// In-memory override map for transactions approved/rejected during current app session.
+class ApprovalOverridesNotifier extends StateNotifier<Map<String, String>> {
+  ApprovalOverridesNotifier() : super({});
+
+  void markStatus(String txnId, String status) {
+    state = {...state, txnId: status};
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
+/// Provider tracking session approval status overrides.
+final approvalOverridesProvider =
+    StateNotifierProvider<ApprovalOverridesNotifier, Map<String, String>>((ref) {
+  return ApprovalOverridesNotifier();
+});
+
+/// Provider for all transactions of the currently active organization with session override protection.
 final orgTransactionsProvider = FutureProvider<List<TransactionModel>>((ref) async {
   final activeOrg = ref.watch(activeOrgProvider);
+  final overrides = ref.watch(approvalOverridesProvider);
   if (activeOrg == null) return [];
 
+  List<TransactionModel> txns = [];
   try {
     final response = await SupabaseService.client
         .from('transactions')
@@ -80,10 +129,22 @@ final orgTransactionsProvider = FutureProvider<List<TransactionModel>>((ref) asy
         .eq('org_id', activeOrg.id)
         .order('date', ascending: false);
 
-    return (response as List).map((row) => TransactionModel.fromMap(row as Map<String, dynamic>)).toList();
+    txns = (response as List).map((row) => TransactionModel.fromMap(row as Map<String, dynamic>)).toList();
   } catch (e) {
-    return [];
+    txns = [];
   }
+
+  // Apply in-memory approval overrides so Net Balance and UI state update immediately
+  if (overrides.isNotEmpty) {
+    txns = txns.map((t) {
+      if (overrides.containsKey(t.id)) {
+        return t.copyWith(approvalStatus: overrides[t.id]);
+      }
+      return t;
+    }).toList();
+  }
+
+  return txns;
 });
 
 /// Provider for ONLY APPROVED transactions (for ledger totals and dashboard calculations).

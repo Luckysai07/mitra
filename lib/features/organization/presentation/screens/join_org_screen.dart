@@ -48,11 +48,13 @@ class _JoinOrgScreenState extends ConsumerState<JoinOrgScreen> {
   }
 
   Future<void> _handleJoinByCode() async {
-    final code = _codeController.text.trim().toUpperCase();
+    final rawInput = _codeController.text;
+    final code = rawInput.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').trim().toUpperCase();
+
     if (code.length != 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter a valid 8-character code (e.g. ABCD1234)'),
+          content: Text('Enter a valid 8-character code (e.g. MTRAB123)'),
           backgroundColor: AppColors.errorLight,
         ),
       );
@@ -74,18 +76,58 @@ class _JoinOrgScreenState extends ConsumerState<JoinOrgScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Find org by join_code
-      final orgResponse = await SupabaseService.client
-          .from('organizations')
-          .select()
-          .eq('join_code', code)
-          .maybeSingle();
+      final cleanCode = code.replaceAll(RegExp(r'\s+'), '').trim();
+      dynamic orgResponse;
+      String? queryErrorMsg;
+
+      try {
+        orgResponse = await SupabaseService.client
+            .from('organizations')
+            .select()
+            .ilike('join_code', cleanCode)
+            .maybeSingle();
+      } catch (e) {
+        queryErrorMsg = e.toString();
+      }
+
+      // Fallback 1: Wildcard pattern match in case database stored padded string
+      if (orgResponse == null) {
+        try {
+          final list = await SupabaseService.client
+              .from('organizations')
+              .select()
+              .ilike('join_code', '%$cleanCode%')
+              .limit(1);
+          if (list is List && list.isNotEmpty) {
+            orgResponse = list.first;
+          }
+        } catch (e) {
+          queryErrorMsg ??= e.toString();
+        }
+      }
+
+      // Fallback 2: Direct equality check
+      if (orgResponse == null) {
+        try {
+          orgResponse = await SupabaseService.client
+              .from('organizations')
+              .select()
+              .eq('join_code', cleanCode)
+              .maybeSingle();
+        } catch (e) {
+          queryErrorMsg ??= e.toString();
+        }
+      }
 
       if (orgResponse == null) {
         if (!mounted) return;
+        final errorText = queryErrorMsg != null 
+            ? 'Error searching code "$cleanCode": $queryErrorMsg'
+            : 'No organization found with code "$cleanCode". Check the code and try again.';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('No organization found with code "$code". Check the code and try again.'),
+            content: Text(errorText),
             backgroundColor: AppColors.errorLight,
           ),
         );
@@ -145,7 +187,18 @@ class _JoinOrgScreenState extends ConsumerState<JoinOrgScreen> {
         joinPayload['role_id'] = roleId;
       }
 
-      await SupabaseService.client.from('organization_members').insert(joinPayload);
+      try {
+        await SupabaseService.client.from('organization_members').insert(joinPayload);
+      } catch (e) {
+        final errStr = e.toString();
+        if (errStr.contains('PGRST204') || errStr.contains('role')) {
+          // Fallback if legacy database schema doesn't have 'role' column yet
+          joinPayload.remove('role');
+          await SupabaseService.client.from('organization_members').insert(joinPayload);
+        } else {
+          rethrow;
+        }
+      }
 
       ref.read(activeOrgProvider.notifier).setActiveOrg(org);
       ref.invalidate(userOrganizationsProvider);

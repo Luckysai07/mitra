@@ -33,7 +33,7 @@ abstract final class AppTheme {
           fontWeight: FontWeight.bold,
         ),
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: AppColors.surface,
         elevation: 2,
         shadowColor: Colors.black.withOpacity(0.06),

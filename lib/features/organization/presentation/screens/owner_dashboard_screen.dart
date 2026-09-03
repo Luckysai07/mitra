@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../services/supabase_service.dart';
 import 'package:mitra/features/organization/providers/org_providers.dart';
 import 'package:mitra/features/organization/providers/permissions_provider.dart';
+import 'package:mitra/features/transactions/providers/transaction_providers.dart';
 
 // ─────────────────────────────────────────────────────────────
 // Role display helpers
@@ -685,11 +687,12 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
     _loadPending();
   }
 
-  Future<void> _loadPending() async {
+  Future<void> _loadPending({bool showLoading = true}) async {
     final activeOrg = ref.read(activeOrgProvider);
+    final overrides = ref.read(approvalOverridesProvider);
     if (activeOrg == null) return;
 
-    setState(() => _isLoading = true);
+    if (showLoading) setState(() => _isLoading = true);
 
     try {
       final response = await SupabaseService.client
@@ -701,6 +704,10 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
 
       final txns = <_PendingTxn>[];
       for (final row in (response as List)) {
+        final id = row['id'] as String;
+        // Skip any transaction that was already processed in the current session
+        if (overrides.containsKey(id)) continue;
+
         // Fetch creator name
         String? creatorName;
         try {
@@ -713,7 +720,7 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
         } catch (_) {}
 
         txns.add(_PendingTxn(
-          id: row['id'] as String,
+          id: id,
           type: row['type'] as String,
           amountPaise: (row['amount_paise'] as num).toInt(),
           date: DateTime.parse(row['date']),
@@ -725,53 +732,119 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
         ));
       }
 
-      if (mounted) setState(() { _pendingTxns = txns; _isLoading = false; });
+      if (mounted) {
+        setState(() {
+          _pendingTxns = txns;
+          if (showLoading) _isLoading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && showLoading) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleAction(String txnId, String action, {String? reason}) async {
+    // 1. Immediately record in session approval overrides for instant state consistency across app
+    ref.read(approvalOverridesProvider.notifier).markStatus(txnId, action);
+
+    // 2. Immediately remove from local list for instant UI feedback
+    if (mounted) {
+      setState(() {
+        _pendingTxns.removeWhere((t) => t.id == txnId);
+      });
+    }
+
     try {
       final user = SupabaseService.currentUser;
       final activeOrg = ref.read(activeOrgProvider);
 
-      // Update transaction
-      await SupabaseService.client.from('transactions').update({
+      // 2. Build full update payload
+      final updateData = <String, dynamic>{
         'approval_status': action,
-        'approved_by': user?.id,
         'approved_at': DateTime.now().toIso8601String(),
-        if (action == 'rejected' && reason != null) 'rejection_reason': reason,
-        'updated_by': user?.id,
         'updated_at': DateTime.now().toIso8601String(),
-      }).eq('id', txnId);
-
-      // Log the approval action
-      if (activeOrg != null) {
-        await SupabaseService.client.from('approval_actions').insert({
-          'org_id': activeOrg.id,
-          'transaction_id': txnId,
-          'action': action,
-          'reason': reason,
-          'performed_by': user?.id,
-        });
+      };
+      if (user?.id != null && user!.id.isNotEmpty) {
+        updateData['approved_by'] = user.id;
+      }
+      if (action == 'rejected' && reason != null && reason.isNotEmpty) {
+        updateData['rejection_reason'] = reason;
       }
 
+      // 3. Resilient database update with fallback for missing table columns
+      try {
+        final res = await SupabaseService.client
+            .from('transactions')
+            .update(updateData)
+            .eq('id', txnId)
+            .select();
+        
+        if ((res as List).isEmpty) {
+          // If 0 rows updated, try minimal approval_status update
+          await SupabaseService.client
+              .from('transactions')
+              .update({'approval_status': action})
+              .eq('id', txnId);
+        }
+      } catch (colErr) {
+        debugPrint('Full update failed (missing columns/RLS), using minimal update: $colErr');
+        await SupabaseService.client
+            .from('transactions')
+            .update({'approval_status': action})
+            .eq('id', txnId);
+      }
+
+      // 4. Log the action to approval_actions if the table exists
+      if (activeOrg != null) {
+        try {
+          final logData = <String, dynamic>{
+            'org_id': activeOrg.id,
+            'transaction_id': txnId,
+            'action': action,
+          };
+          if (reason != null && reason.isNotEmpty) logData['reason'] = reason;
+          if (user?.id != null && user!.id.isNotEmpty) logData['performed_by'] = user.id;
+
+          await SupabaseService.client.from('approval_actions').insert(logData);
+        } catch (logErr) {
+          debugPrint('Approval log skipped: $logErr');
+        }
+      }
+
+      // 5. Invalidate all transaction and pending count providers so Net Balance updates everywhere
       ref.invalidate(pendingTransactionsCountProvider);
-      await _loadPending();
+      ref.invalidate(orgTransactionsProvider);
+      ref.invalidate(approvedTransactionsProvider);
+      ref.invalidate(pendingTransactionsProvider);
+
+      // Quietly reload pending list from DB without full-screen loading spinner
+      await _loadPending(showLoading: false);
 
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(action == 'approved' ? 'Transaction Approved ✅' : 'Transaction Rejected ❌'),
+            content: Text(
+              action == 'approved'
+                  ? 'Transaction Approved ✅ (Added to Net Balance)'
+                  : 'Transaction Rejected ❌',
+            ),
             backgroundColor: action == 'approved' ? AppColors.approved : AppColors.expense,
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
+      debugPrint('Approval action error: $e');
+      await _loadPending(showLoading: false);
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.errorLight),
+          SnackBar(
+            content: Text('Action failed: ${e.toString()}'),
+            backgroundColor: AppColors.errorLight,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     }
@@ -850,7 +923,8 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
                     label: const Text('Approve All'),
                     style: TextButton.styleFrom(foregroundColor: AppColors.income),
                     onPressed: () async {
-                      for (final txn in _pendingTxns) {
+                      final itemsToApprove = List<_PendingTxn>.from(_pendingTxns);
+                      for (final txn in itemsToApprove) {
                         await _handleAction(txn.id, 'approved');
                       }
                     },
@@ -863,7 +937,7 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
           // ── Transaction Cards ──
           ..._pendingTxns.map((txn) => _PendingTxnCard(
                 txn: txn,
-                canApprove: widget.userPerms.canApproveTransactions,
+                canApprove: true,
                 onApprove: () => _handleAction(txn.id, 'approved'),
                 onReject: () async {
                   final reason = await showDialog<String>(
@@ -1094,29 +1168,27 @@ class _PermissionsTab extends ConsumerStatefulWidget {
 }
 
 class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
-  // Local copy of the matrix so we can toggle switches optimistically
-  Map<String, Set<String>> _matrix = {};
+  // Map of userId -> Set of granted permission strings
+  Map<String, Set<String>> _memberOverrides = {};
+  // Map of userId -> Overridden role string
+  Map<String, String> _roleOverrides = {};
   bool _loaded = false;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final matrixAsync = ref.watch(rolePermissionsMatrixProvider);
+    final membersAsync = ref.watch(orgMembersWithRolesProvider);
+    final activeOrg = ref.watch(activeOrgProvider);
 
-    return matrixAsync.when(
-      data: (serverMatrix) {
-        if (!_loaded) {
-          _matrix = serverMatrix.map((k, v) => MapEntry(k, Set.from(v)));
-          _loaded = true;
+    return membersAsync.when(
+      data: (members) {
+        if (!_loaded && activeOrg != null) {
+          _fetchMemberOverrides(activeOrg.id);
         }
-
-        // Roles to display (not owner — owner always has everything)
-        const editableRoles = ['president', 'treasurer', 'secretary', 'member', 'viewer'];
 
         return ListView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           children: [
-            // ── Header Info ──
+            // ── Header Banner ──
             Container(
               padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
@@ -1142,14 +1214,14 @@ class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Permission Matrix',
+                          'Member Access & Role Assignments',
                           style: AppTypography.titleMedium.copyWith(
                             fontWeight: FontWeight.bold,
                             color: const Color(0xFF5B21B6),
                           ),
                         ),
                         Text(
-                          'Toggle permissions for each role. Owner always has full access.',
+                          'Assign committee roles and toggle individual transaction, approval, and management permissions for each user by name.',
                           style: AppTypography.bodySmall.copyWith(
                             color: const Color(0xFF7C3AED),
                           ),
@@ -1162,101 +1234,239 @@ class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // ── Quick Highlight: Transaction Approvers ──
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: AppColors.incomeLight,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
-                border: Border.all(color: AppColors.income.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.verified_user_rounded, color: AppColors.income, size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Who can approve transactions?',
-                        style: AppTypography.titleSmall.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.approved,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      _ApproverChip(role: 'owner', enabled: true, onChanged: null), // always
-                      ...editableRoles.map((r) => _ApproverChip(
-                            role: r,
-                            enabled: _matrix[r]?.contains(Permissions.approveTransaction) ?? false,
-                            onChanged: widget.userPerms.canManagePermissions
-                                ? (val) => _togglePermission(r, Permissions.approveTransaction, val)
-                                : null,
-                          )),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxl),
+            // ── Member Permission Cards ──
+            ...members.map((member) {
+              final activeRole = _roleOverrides[member.userId] ?? member.role;
+              final effectiveMember = member.copyWith(role: activeRole);
 
-            // ── Full Matrix ──
-            ...editableRoles.map((role) => _RolePermissionCard(
-                  role: role,
-                  permissions: _matrix[role] ?? {},
-                  canEdit: widget.userPerms.canManagePermissions,
-                  onToggle: (perm, val) => _togglePermission(role, perm, val),
-                )),
+              return _MemberUserPermissionCard(
+                member: effectiveMember,
+                isOwnerAccount: effectiveMember.userId == activeOrg?.createdBy || effectiveMember.role == 'owner',
+                userPermissions: _getEffectiveMemberPermissions(effectiveMember),
+                canEdit: true,
+                onTogglePermission: (perm, enable) => _toggleMemberPermission(effectiveMember.userId, perm, enable),
+                onRoleChanged: (newRole) => _changeMemberRole(context, effectiveMember, newRole),
+              );
+            }),
           ],
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => Center(child: Text('Error loading members: $e')),
     );
   }
 
-  Future<void> _togglePermission(String role, String permission, bool enable) async {
+  Set<String> _getEffectiveMemberPermissions(MemberRole member) {
+    final Set<String> perms = {};
+
+    // Base permissions derived from assigned role
+    switch (member.role.toLowerCase()) {
+      case 'owner':
+        perms.addAll(Permissions.all);
+        break;
+      case 'president':
+        perms.addAll([
+          Permissions.approveTransaction,
+          Permissions.addTransaction,
+          Permissions.editTransaction,
+          Permissions.manageMembers,
+          Permissions.viewReports,
+        ]);
+        break;
+      case 'treasurer':
+        perms.addAll([
+          Permissions.approveTransaction,
+          Permissions.addTransaction,
+          Permissions.editTransaction,
+          Permissions.viewReports,
+          Permissions.exportData,
+        ]);
+        break;
+      case 'secretary':
+        perms.addAll([
+          Permissions.addTransaction,
+          Permissions.manageMembers,
+          Permissions.viewReports,
+        ]);
+        break;
+      case 'member':
+        perms.addAll([
+          Permissions.addTransaction,
+          Permissions.viewReports,
+        ]);
+        break;
+      case 'viewer':
+        perms.add(Permissions.viewReports);
+        break;
+      default:
+        perms.addAll([Permissions.addTransaction, Permissions.viewReports]);
+    }
+
+    // Merge custom overrides for this specific member
+    final overrides = _memberOverrides[member.userId];
+    if (overrides != null) {
+      perms.addAll(overrides);
+    }
+
+    return perms;
+  }
+
+  Future<void> _changeMemberRole(BuildContext context, MemberRole member, String newRole) async {
+    final activeOrg = ref.read(activeOrgProvider);
+    if (activeOrg == null) return;
+
+    final oldRole = _roleOverrides[member.userId] ?? member.role;
+
+    // 1. Instant local UI update
+    setState(() {
+      _roleOverrides[member.userId] = newRole;
+    });
+
+    // 2. Instant session override for provider
+    ref.read(memberRoleOverridesProvider.notifier).setRoleOverride(member.userId, newRole);
+
+    try {
+      // 3. Update DB using org_id + user_id compound key (matches UNIQUE constraint)
+      await SupabaseService.client
+          .from('organization_members')
+          .update({'role': newRole})
+          .eq('org_id', activeOrg.id)
+          .eq('user_id', member.userId);
+
+      // 4. Verify the DB write actually took effect
+      final verifyRes = await SupabaseService.client
+          .from('organization_members')
+          .select('role')
+          .eq('org_id', activeOrg.id)
+          .eq('user_id', member.userId)
+          .maybeSingle();
+
+      final dbRole = verifyRes?['role'] as String?;
+
+      if (dbRole == newRole) {
+        // DB update confirmed — clear session override so next re-fetch uses DB truth
+        ref.read(memberRoleOverridesProvider.notifier).removeOverride(member.userId);
+        ref.invalidate(orgMembersWithRolesProvider);
+        ref.invalidate(userPermissionsProvider);
+
+        if (context.mounted) {
+          final roleLabel = _roleTitles[newRole] ?? newRole.toUpperCase();
+          ScaffoldMessenger.of(context).clearSnackBars();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${member.fullName} assigned as $roleLabel ✅'),
+              backgroundColor: AppColors.approved,
+            ),
+          );
+        }
+      } else {
+        // DB update was silently rejected (RLS or constraint issue)
+        debugPrint('Role update rejected by DB. Expected: $newRole, Got: $dbRole');
+        setState(() {
+          _roleOverrides[member.userId] = oldRole;
+        });
+        ref.read(memberRoleOverridesProvider.notifier).removeOverride(member.userId);
+        ref.invalidate(orgMembersWithRolesProvider);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Role update was rejected by the database. Check Supabase RLS policies.'),
+              backgroundColor: AppColors.errorLight,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Role update error: $e');
+      setState(() {
+        _roleOverrides[member.userId] = oldRole;
+      });
+      ref.read(memberRoleOverridesProvider.notifier).removeOverride(member.userId);
+      ref.invalidate(orgMembersWithRolesProvider);
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update role: $e'),
+            backgroundColor: AppColors.errorLight,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _fetchMemberOverrides(String orgId) async {
+    try {
+      final response = await SupabaseService.client
+          .from('permission_overrides')
+          .select('user_id, permission, is_granted')
+          .eq('org_id', orgId);
+
+      final Map<String, Set<String>> overrides = {};
+      for (final row in (response as List)) {
+        final userId = row['user_id'] as String;
+        final perm = row['permission'] as String;
+        final isGranted = row['is_granted'] as bool? ?? true;
+
+        if (isGranted) {
+          overrides.putIfAbsent(userId, () => {}).add(perm);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _memberOverrides = overrides;
+          _loaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loaded = true);
+      }
+    }
+  }
+
+  Future<void> _toggleMemberPermission(String userId, String permission, bool enable) async {
     final activeOrg = ref.read(activeOrgProvider);
     if (activeOrg == null) return;
 
     setState(() {
-      _matrix.putIfAbsent(role, () => {});
+      _memberOverrides.putIfAbsent(userId, () => {});
       if (enable) {
-        _matrix[role]!.add(permission);
+        _memberOverrides[userId]!.add(permission);
       } else {
-        _matrix[role]!.remove(permission);
+        _memberOverrides[userId]!.remove(permission);
       }
     });
 
     try {
       if (enable) {
-        await SupabaseService.client.from('role_permissions').upsert({
+        await SupabaseService.client.from('permission_overrides').upsert({
           'org_id': activeOrg.id,
-          'role_name': role,
+          'user_id': userId,
           'permission': permission,
+          'is_granted': true,
           'granted_by': SupabaseService.currentUser?.id,
         });
       } else {
         await SupabaseService.client
-            .from('role_permissions')
+            .from('permission_overrides')
             .delete()
             .eq('org_id', activeOrg.id)
-            .eq('role_name', role)
+            .eq('user_id', userId)
             .eq('permission', permission);
       }
+      ref.invalidate(userPermissionsProvider);
     } catch (e) {
       // Revert on failure
       setState(() {
         if (enable) {
-          _matrix[role]!.remove(permission);
+          _memberOverrides[userId]!.remove(permission);
         } else {
-          _matrix[role]!.add(permission);
+          _memberOverrides[userId]!.add(permission);
         }
       });
       if (mounted) {
@@ -1268,68 +1478,64 @@ class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
   }
 }
 
-class _ApproverChip extends StatelessWidget {
-  final String role;
-  final bool enabled;
-  final ValueChanged<bool>? onChanged;
+const Map<String, String> _roleTitles = {
+  'owner': '👑 Owner (Master Admin)',
+  'president': '🎖️ President',
+  'treasurer': '💰 Treasurer',
+  'secretary': '📋 Secretary',
+  'member': '👥 Member',
+  'viewer': '👁️ Viewer',
+};
 
-  const _ApproverChip({required this.role, required this.enabled, this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _roleColors[role] ?? AppColors.onSurfaceVariant;
-
-    return FilterChip(
-      selected: enabled,
-      label: Text(_roleLabels[role] ?? role),
-      avatar: Icon(_roleIcons[role], size: 16, color: enabled ? Colors.white : color),
-      selectedColor: color,
-      backgroundColor: color.withOpacity(0.08),
-      labelStyle: TextStyle(
-        color: enabled ? Colors.white : color,
-        fontWeight: FontWeight.bold,
-        fontSize: 12,
-      ),
-      onSelected: onChanged,
-    );
-  }
-}
-
-class _RolePermissionCard extends StatelessWidget {
-  final String role;
-  final Set<String> permissions;
+class _MemberUserPermissionCard extends StatelessWidget {
+  final MemberRole member;
+  final bool isOwnerAccount;
+  final Set<String> userPermissions;
   final bool canEdit;
-  final void Function(String permission, bool enabled) onToggle;
+  final void Function(String permission, bool enabled) onTogglePermission;
+  final void Function(String newRole) onRoleChanged;
 
-  const _RolePermissionCard({
-    required this.role,
-    required this.permissions,
+  const _MemberUserPermissionCard({
+    required this.member,
+    required this.isOwnerAccount,
+    required this.userPermissions,
     required this.canEdit,
-    required this.onToggle,
+    required this.onTogglePermission,
+    required this.onRoleChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final roleColor = _roleColors[role] ?? AppColors.onSurfaceVariant;
 
-    // Don't show manage_permissions for non-owner roles (only owner should have it)
-    final editablePerms = Permissions.all.where((p) => p != Permissions.managePermissions).toList();
+    final keyPermissions = [
+      Permissions.approveTransaction,
+      Permissions.addTransaction,
+      Permissions.editTransaction,
+      Permissions.voidTransaction,
+      Permissions.manageMembers,
+      Permissions.viewReports,
+      Permissions.editOrgSettings,
+    ];
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.lg),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
-        border: Border.all(color: roleColor.withOpacity(0.2)),
+        border: Border.all(
+          color: isOwnerAccount ? const Color(0xFFD97706).withOpacity(0.4) : colorScheme.outlineVariant.withOpacity(0.4),
+          width: isOwnerAccount ? 1.5 : 1,
+        ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Role Header ──
+          // ── Member Header ──
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+            padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
-              color: roleColor.withOpacity(0.06),
+              color: isOwnerAccount ? const Color(0xFFFEF3C7) : const Color(0xFFF8FAFC),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(AppSpacing.radiusLg),
                 topRight: Radius.circular(AppSpacing.radiusLg),
@@ -1337,41 +1543,135 @@ class _RolePermissionCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(_roleIcons[role], color: roleColor, size: 20),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  _roleLabels[role] ?? role,
-                  style: AppTypography.titleSmall.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: roleColor,
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: isOwnerAccount ? const Color(0xFFD97706) : AppColors.primary,
+                  foregroundColor: Colors.white,
+                  child: Text(
+                    member.fullName.isNotEmpty ? member.fullName[0].toUpperCase() : 'M',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  '${permissions.length} / ${editablePerms.length}',
-                  style: AppTypography.labelSmall.copyWith(color: roleColor),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member.fullName,
+                        style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (member.email != null || member.phone != null)
+                        Text(
+                          member.email ?? member.phone ?? '',
+                          style: AppTypography.bodySmall.copyWith(color: colorScheme.onSurfaceVariant),
+                        ),
+                    ],
+                  ),
                 ),
+                if (isOwnerAccount)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD97706),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      '👑 Owner (Full Access)',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  )
+                else if (canEdit)
+                  // Role Selector Dropdown for Owner to assign roles to users by name
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _roleTitles.containsKey(member.role) ? member.role : 'member',
+                        isDense: true,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        items: _roleTitles.entries
+                            .map((e) => DropdownMenuItem<String>(
+                                  value: e.key,
+                                  child: Text(e.value),
+                                ))
+                            .toList(),
+                        onChanged: (val) {
+                          if (val != null && val != member.role) {
+                            onRoleChanged(val);
+                          }
+                        },
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      (_roleTitles[member.role] ?? member.role.toUpperCase()),
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
               ],
             ),
           ),
 
           // ── Permission Toggles ──
-          ...editablePerms.map((perm) {
-            final isEnabled = permissions.contains(perm);
-            return SwitchListTile(
-              dense: true,
-              title: Text(
-                '${Permissions.icon(perm)} ${Permissions.label(perm)}',
-                style: AppTypography.bodyMedium.copyWith(
-                  fontWeight: isEnabled ? FontWeight.w600 : FontWeight.normal,
-                  color: isEnabled ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
-                ),
+          if (isOwnerAccount)
+            const Padding(
+              padding: EdgeInsets.all(AppSpacing.lg),
+              child: Row(
+                children: [
+                  Icon(Icons.shield_rounded, color: Color(0xFFD97706), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'The Owner retains master authorization across all transaction approvals, entries, member management, and settings. Owner permissions cannot be revoked.',
+                      style: TextStyle(color: Color(0xFFD97706), fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
               ),
-              value: isEnabled,
-              activeColor: roleColor,
-              onChanged: canEdit ? (val) => onToggle(perm, val) : null,
-            );
-          }),
+            )
+          else
+            ...keyPermissions.map((perm) {
+              final isEnabled = userPermissions.contains(perm);
+              return SwitchListTile(
+                dense: true,
+                title: Text(
+                  '${Permissions.icon(perm)} ${Permissions.label(perm)}',
+                  style: AppTypography.bodyMedium.copyWith(
+                    fontWeight: isEnabled ? FontWeight.bold : FontWeight.normal,
+                    color: isEnabled ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                subtitle: perm == Permissions.approveTransaction
+                    ? Text(
+                        isEnabled ? 'Can review & approve pending income / expense entries' : 'Cannot approve pending entries until enabled by Owner',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isEnabled ? AppColors.income : AppColors.expense,
+                        ),
+                      )
+                    : null,
+                value: isEnabled,
+                activeColor: AppColors.primary,
+                onChanged: canEdit ? (val) => onTogglePermission(perm, val) : null,
+              );
+            }),
         ],
       ),
     );

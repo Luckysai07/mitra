@@ -76,9 +76,11 @@ class OrgSwitcherScreen extends ConsumerWidget {
               );
             }
 
-            return ListView(
-              padding: const EdgeInsets.all(AppSpacing.xl),
-              children: [
+            return RefreshIndicator(
+              onRefresh: () async => ref.invalidate(userOrganizationsProvider),
+              child: ListView(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                children: [
                 Text(
                   'Switch Active Ledger',
                   style: AppTypography.titleMedium.copyWith(
@@ -182,8 +184,9 @@ class OrgSwitcherScreen extends ConsumerWidget {
                   ],
                 ),
               ],
-            );
-          },
+            ),
+          );
+        },
         ),
       ),
     );

@@ -51,7 +51,8 @@ class ReportsScreen extends ConsumerWidget {
               child: txnsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (err, stack) => Center(child: Text('Error loading report: $err')),
-                data: (txns) {
+                data: (rawTxns) {
+                  final txns = rawTxns.where((t) => t.approvalStatus == 'approved').toList();
                   int totalIncomePaise = 0;
                   int totalExpensePaise = 0;
 

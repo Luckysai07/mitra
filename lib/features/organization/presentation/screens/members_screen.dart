@@ -232,7 +232,13 @@ class MembersScreen extends ConsumerWidget {
                             ),
                             title: Row(
                               children: [
-                                Text(m.name, style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold)),
+                                Flexible(
+                                  child: Text(
+                                    m.name,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.titleMedium.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

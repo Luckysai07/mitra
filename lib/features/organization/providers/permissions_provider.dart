@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/supabase_service.dart';
+import '../../transactions/providers/transaction_providers.dart';
 import 'org_providers.dart';
 
 // ─────────────────────────────────────────────────────────────
@@ -126,6 +127,28 @@ class MemberRole {
       joinedAt: map['joined_at'] != null
           ? DateTime.parse(map['joined_at'])
           : DateTime.now(),
+    );
+  }
+
+  MemberRole copyWith({
+    String? memberId,
+    String? userId,
+    String? role,
+    String? status,
+    String? fullName,
+    String? email,
+    String? phone,
+    DateTime? joinedAt,
+  }) {
+    return MemberRole(
+      memberId: memberId ?? this.memberId,
+      userId: userId ?? this.userId,
+      role: role ?? this.role,
+      status: status ?? this.status,
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      joinedAt: joinedAt ?? this.joinedAt,
     );
   }
 }
@@ -255,10 +278,40 @@ final userPermissionsProvider = FutureProvider<UserPermissions>((ref) async {
   }
 });
 
-/// Fetches all members of the active org with their roles.
+/// Session role overrides notifier (userId -> overriddenRole)
+/// Only used for instant UI feedback while the DB update is in flight.
+class MemberRoleOverridesNotifier extends StateNotifier<Map<String, String>> {
+  MemberRoleOverridesNotifier() : super({});
+
+  void setRoleOverride(String userId, String newRole) {
+    final updated = Map<String, String>.from(state);
+    updated[userId] = newRole;
+    state = updated;
+  }
+
+  void removeOverride(String userId) {
+    final copy = {...state};
+    copy.remove(userId);
+    state = copy;
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
+final memberRoleOverridesProvider =
+    StateNotifierProvider<MemberRoleOverridesNotifier, Map<String, String>>((ref) {
+  return MemberRoleOverridesNotifier();
+});
+
+/// Fetches all members of the active org with their roles from the database.
+/// Session overrides are applied for instant UI feedback only.
 final orgMembersWithRolesProvider = FutureProvider<List<MemberRole>>((ref) async {
   final activeOrg = ref.watch(activeOrgProvider);
   if (activeOrg == null) return [];
+
+  final sessionOverrides = ref.watch(memberRoleOverridesProvider);
 
   try {
     final response = await SupabaseService.client
@@ -267,9 +320,22 @@ final orgMembersWithRolesProvider = FutureProvider<List<MemberRole>>((ref) async
         .eq('org_id', activeOrg.id)
         .order('joined_at', ascending: true);
 
-    return (response as List)
+    final List<MemberRole> members = (response as List)
         .map((row) => MemberRole.fromMap(row as Map<String, dynamic>))
         .toList();
+
+    // Apply session overrides for instant UI (cleared after successful DB write + re-fetch)
+    if (sessionOverrides.isNotEmpty) {
+      return members.map((m) {
+        final override = sessionOverrides[m.userId];
+        if (override != null) {
+          return m.copyWith(role: override);
+        }
+        return m;
+      }).toList();
+    }
+
+    return members;
   } catch (e) {
     return [];
   }
@@ -303,6 +369,7 @@ final rolePermissionsMatrixProvider =
 /// Fetches pending transactions count for badge display.
 final pendingTransactionsCountProvider = FutureProvider<int>((ref) async {
   final activeOrg = ref.watch(activeOrgProvider);
+  final overrides = ref.watch(approvalOverridesProvider);
   if (activeOrg == null) return 0;
 
   try {
@@ -312,7 +379,13 @@ final pendingTransactionsCountProvider = FutureProvider<int>((ref) async {
         .eq('org_id', activeOrg.id)
         .eq('approval_status', 'pending');
 
-    return (response as List).length;
+    final rawList = response as List;
+    final count = rawList.where((row) {
+      final id = row['id'] as String;
+      return !overrides.containsKey(id);
+    }).length;
+
+    return count;
   } catch (e) {
     return 0;
   }

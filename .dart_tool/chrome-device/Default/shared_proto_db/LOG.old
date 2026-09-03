@@ -1,4 +1,10 @@
-2026/08/26-19:06:51.012 6640 Reusing MANIFEST C:\Users\kadig\AppData\Local\Temp\flutter_tools.680c8987\flutter_tools_chrome_device.524c82b5\Default\shared_proto_db/MANIFEST-000001
-2026/08/26-19:06:51.013 6640 Recovering log #4
-2026/08/26-19:06:51.014 6640 Reusing old log C:\Users\kadig\AppData\Local\Temp\flutter_tools.680c8987\flutter_tools_chrome_device.524c82b5\Default\shared_proto_db/000004.log 
-2026/08/26-19:06:51.014 6640 Delete type=0 #3
+2026/09/03-16:57:04.837 2fb8 Reusing MANIFEST C:\Users\kadig\AppData\Local\Temp\flutter_tools.d3bd8b51\flutter_tools_chrome_device.8add14ce\Default\shared_proto_db/MANIFEST-000001
+2026/09/03-16:57:04.837 2fb8 Recovering log #13
+2026/09/03-16:57:04.839 2fb8 Reusing old log C:\Users\kadig\AppData\Local\Temp\flutter_tools.d3bd8b51\flutter_tools_chrome_device.8add14ce\Default\shared_proto_db/000013.log 
+2026/09/03-16:57:04.840 2fb8 Delete type=0 #3
+2026/09/03-16:57:04.840 2fb8 Delete type=0 #4
+2026/09/03-16:57:04.840 2fb8 Delete type=0 #7
+2026/09/03-16:57:04.840 2fb8 Delete type=0 #10
+2026/09/03-16:57:19.248 6a78 Level-0 table #17: started
+2026/09/03-16:57:19.254 6a78 Level-0 table #17: 135456 bytes OK
+2026/09/03-16:57:19.258 6a78 Delete type=0 #13

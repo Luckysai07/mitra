@@ -67,32 +67,29 @@ final userOrganizationsProvider = FutureProvider<List<OrganizationModel>>((ref) 
   try {
     final membersResponse = await SupabaseService.client
         .from('organization_members')
-        .select('org_id, organizations(*)')
+        .select('org_id')
         .eq('user_id', user.id);
 
+    final List<String> memberOrgIds = [];
     for (final row in (membersResponse as List)) {
-      if (row['organizations'] != null) {
-        final org = OrganizationModel.fromMap(row['organizations'] as Map<String, dynamic>);
+      final orgId = row['org_id'] as String?;
+      if (orgId != null && !orgMap.containsKey(orgId)) {
+        memberOrgIds.add(orgId);
+      }
+    }
+
+    if (memberOrgIds.isNotEmpty) {
+      final orgsResponse = await SupabaseService.client
+          .from('organizations')
+          .select()
+          .inFilter('id', memberOrgIds);
+
+      for (final row in (orgsResponse as List)) {
+        final org = OrganizationModel.fromMap(row as Map<String, dynamic>);
         orgMap[org.id] = org;
       }
     }
   } catch (_) {}
-
-  // 3. Fallback query: All active organizations if user has authenticated role
-  if (orgMap.isEmpty) {
-    try {
-      final allOrgs = await SupabaseService.client
-          .from('organizations')
-          .select()
-          .order('created_at', ascending: false)
-          .limit(10);
-
-      for (final row in (allOrgs as List)) {
-        final org = OrganizationModel.fromMap(row as Map<String, dynamic>);
-        orgMap[org.id] = org;
-      }
-    } catch (_) {}
-  }
 
   final list = orgMap.values.toList();
   return list;
