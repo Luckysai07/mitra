@@ -231,34 +231,81 @@ final userPermissionsProvider = FutureProvider<UserPermissions>((ref) async {
       );
     }
 
-    // 2. Get role-based permissions
-    final permsResponse = await SupabaseService.client
-        .from('role_permissions')
-        .select('permission')
-        .eq('org_id', activeOrg.id)
-        .eq('role_name', role);
-
+    // 2. Base permissions for the role (built-in fallback defaults)
     final Set<String> perms = {};
-    for (final row in (permsResponse as List)) {
-      perms.add(row['permission'] as String);
+    switch (role.toLowerCase()) {
+      case 'owner':
+        perms.addAll(Permissions.all);
+        break;
+      case 'president':
+        perms.addAll([
+          Permissions.approveTransaction,
+          Permissions.addTransaction,
+          Permissions.editTransaction,
+          Permissions.manageMembers,
+          Permissions.viewReports,
+        ]);
+        break;
+      case 'treasurer':
+        // Treasurer can add and edit transactions, but does not auto-approve unless granted by Owner!
+        perms.addAll([
+          Permissions.addTransaction,
+          Permissions.editTransaction,
+          Permissions.viewReports,
+          Permissions.exportData,
+        ]);
+        break;
+      case 'secretary':
+        perms.addAll([
+          Permissions.addTransaction,
+          Permissions.manageMembers,
+          Permissions.viewReports,
+        ]);
+        break;
+      case 'member':
+        perms.addAll([
+          Permissions.addTransaction,
+          Permissions.viewReports,
+        ]);
+        break;
+      case 'viewer':
+        perms.add(Permissions.viewReports);
+        break;
+      default:
+        perms.addAll([Permissions.addTransaction, Permissions.viewReports]);
     }
 
-    // 3. Get individual permission overrides
-    final overridesResponse = await SupabaseService.client
-        .from('permission_overrides')
-        .select('permission, is_granted')
-        .eq('org_id', activeOrg.id)
-        .eq('user_id', user.id);
+    // 2b. Merge custom database role_permissions if available
+    try {
+      final permsResponse = await SupabaseService.client
+          .from('role_permissions')
+          .select('permission')
+          .eq('org_id', activeOrg.id)
+          .eq('role_name', role);
 
-    for (final row in (overridesResponse as List)) {
-      final perm = row['permission'] as String;
-      final isGranted = row['is_granted'] as bool? ?? true;
-      if (isGranted) {
-        perms.add(perm);
-      } else {
-        perms.remove(perm);
+      for (final row in (permsResponse as List)) {
+        perms.add(row['permission'] as String);
       }
-    }
+    } catch (_) {}
+
+    // 3. Apply individual permission overrides (grant OR revoke)
+    try {
+      final overridesResponse = await SupabaseService.client
+          .from('permission_overrides')
+          .select('permission, is_granted')
+          .eq('org_id', activeOrg.id)
+          .eq('user_id', user.id);
+
+      for (final row in (overridesResponse as List)) {
+        final perm = row['permission'] as String;
+        final isGranted = row['is_granted'] as bool? ?? true;
+        if (isGranted) {
+          perms.add(perm);
+        } else {
+          perms.remove(perm);
+        }
+      }
+    } catch (_) {}
 
     return UserPermissions(
       role: role,

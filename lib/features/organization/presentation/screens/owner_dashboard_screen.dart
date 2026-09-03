@@ -61,6 +61,11 @@ class _OwnerDashboardScreenState extends ConsumerState<OwnerDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && _tabController.index == 1) {
+        ref.invalidate(pendingTransactionsCountProvider);
+      }
+    });
   }
 
   @override
@@ -93,6 +98,24 @@ class _OwnerDashboardScreenState extends ConsumerState<OwnerDashboardScreen>
               ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh Data',
+            onPressed: () {
+              ref.invalidate(orgMembersWithRolesProvider);
+              ref.invalidate(pendingTransactionsCountProvider);
+              ref.invalidate(userPermissionsProvider);
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Dashboard refreshed! 🔄'),
+                  duration: Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: const Color(0xFFD97706),
@@ -704,31 +727,50 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
 
       final txns = <_PendingTxn>[];
       for (final row in (response as List)) {
-        final id = row['id'] as String;
-        // Skip any transaction that was already processed in the current session
-        if (overrides.containsKey(id)) continue;
+        final id = row['id']?.toString() ?? '';
+        if (id.isEmpty || overrides.containsKey(id)) continue;
 
-        // Fetch creator name
+        // Fetch creator name safely
         String? creatorName;
-        try {
-          final userRes = await SupabaseService.client
-              .from('users')
-              .select('full_name')
-              .eq('id', row['created_by'])
-              .maybeSingle();
-          creatorName = userRes?['full_name'] as String?;
-        } catch (_) {}
+        final creatorId = row['created_by']?.toString();
+        if (creatorId != null && creatorId.isNotEmpty) {
+          try {
+            final userRes = await SupabaseService.client
+                .from('users')
+                .select('full_name')
+                .eq('id', creatorId)
+                .maybeSingle();
+            creatorName = userRes?['full_name'] as String?;
+          } catch (_) {}
+        }
+
+        DateTime parsedDate = DateTime.now();
+        if (row['date'] != null) {
+          parsedDate = DateTime.tryParse(row['date'].toString()) ?? DateTime.now();
+        }
+
+        DateTime parsedCreatedAt = DateTime.now();
+        if (row['created_at'] != null) {
+          parsedCreatedAt = DateTime.tryParse(row['created_at'].toString()) ?? DateTime.now();
+        }
+
+        int amount = 0;
+        if (row['amount_paise'] is num) {
+          amount = (row['amount_paise'] as num).toInt();
+        } else if (row['amount_paise'] != null) {
+          amount = int.tryParse(row['amount_paise'].toString()) ?? 0;
+        }
 
         txns.add(_PendingTxn(
           id: id,
-          type: row['type'] as String,
-          amountPaise: (row['amount_paise'] as num).toInt(),
-          date: DateTime.parse(row['date']),
+          type: row['type']?.toString() ?? 'income',
+          amountPaise: amount,
+          date: parsedDate,
           description: row['description'] as String?,
           personName: row['person_name'] as String?,
-          createdBy: row['created_by'] as String,
+          createdBy: creatorId ?? '',
           creatorName: creatorName,
-          createdAt: DateTime.parse(row['created_at']),
+          createdAt: parsedCreatedAt,
         ));
       }
 
@@ -882,6 +924,12 @@ class _ApprovalsTabState extends ConsumerState<_ApprovalsTab> {
               Text(
                 'No pending transactions to review.',
                 style: AppTypography.bodyMedium.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton.tonalIcon(
+                onPressed: () => _loadPending(showLoading: true),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Check for New Submissions'),
               ),
             ],
           ),
@@ -1168,8 +1216,8 @@ class _PermissionsTab extends ConsumerStatefulWidget {
 }
 
 class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
-  // Map of userId -> Set of granted permission strings
-  Map<String, Set<String>> _memberOverrides = {};
+  // Map of userId -> Map of permission -> isGranted boolean
+  Map<String, Map<String, bool>> _memberOverrides = {};
   // Map of userId -> Overridden role string
   Map<String, String> _roleOverrides = {};
   bool _loaded = false;
@@ -1274,8 +1322,8 @@ class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
         ]);
         break;
       case 'treasurer':
+        // Treasurer can record/edit transactions, but requires explicit Owner grant for approvals
         perms.addAll([
-          Permissions.approveTransaction,
           Permissions.addTransaction,
           Permissions.editTransaction,
           Permissions.viewReports,
@@ -1302,10 +1350,16 @@ class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
         perms.addAll([Permissions.addTransaction, Permissions.viewReports]);
     }
 
-    // Merge custom overrides for this specific member
-    final overrides = _memberOverrides[member.userId];
-    if (overrides != null) {
-      perms.addAll(overrides);
+    // Merge custom overrides for this specific member (grant OR revoke)
+    final userOverrides = _memberOverrides[member.userId];
+    if (userOverrides != null) {
+      userOverrides.forEach((perm, isGranted) {
+        if (isGranted) {
+          perms.add(perm);
+        } else {
+          perms.remove(perm);
+        }
+      });
     }
 
     return perms;
@@ -1405,15 +1459,12 @@ class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
           .select('user_id, permission, is_granted')
           .eq('org_id', orgId);
 
-      final Map<String, Set<String>> overrides = {};
+      final Map<String, Map<String, bool>> overrides = {};
       for (final row in (response as List)) {
         final userId = row['user_id'] as String;
         final perm = row['permission'] as String;
         final isGranted = row['is_granted'] as bool? ?? true;
-
-        if (isGranted) {
-          overrides.putIfAbsent(userId, () => {}).add(perm);
-        }
+        overrides.putIfAbsent(userId, () => {})[perm] = isGranted;
       }
 
       if (mounted) {
@@ -1433,41 +1484,40 @@ class _PermissionsTabState extends ConsumerState<_PermissionsTab> {
     final activeOrg = ref.read(activeOrgProvider);
     if (activeOrg == null) return;
 
+    // Instant local UI state update
     setState(() {
-      _memberOverrides.putIfAbsent(userId, () => {});
-      if (enable) {
-        _memberOverrides[userId]!.add(permission);
-      } else {
-        _memberOverrides[userId]!.remove(permission);
-      }
+      _memberOverrides.putIfAbsent(userId, () => {})[permission] = enable;
     });
 
     try {
-      if (enable) {
-        await SupabaseService.client.from('permission_overrides').upsert({
-          'org_id': activeOrg.id,
-          'user_id': userId,
-          'permission': permission,
-          'is_granted': true,
-          'granted_by': SupabaseService.currentUser?.id,
-        });
-      } else {
-        await SupabaseService.client
-            .from('permission_overrides')
-            .delete()
-            .eq('org_id', activeOrg.id)
-            .eq('user_id', userId)
-            .eq('permission', permission);
-      }
+      await SupabaseService.client.from('permission_overrides').upsert({
+        'org_id': activeOrg.id,
+        'user_id': userId,
+        'permission': permission,
+        'is_granted': enable,
+        'granted_by': SupabaseService.currentUser?.id,
+        'granted_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'org_id,user_id,permission');
+
       ref.invalidate(userPermissionsProvider);
+
+      if (mounted) {
+        final permName = Permissions.label(permission);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              enable ? '$permName enabled ✅' : '$permName disabled 🚫',
+            ),
+            backgroundColor: enable ? AppColors.approved : AppColors.expense,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      // Revert on failure
+      debugPrint('Failed to save permission override: $e');
       setState(() {
-        if (enable) {
-          _memberOverrides[userId]!.remove(permission);
-        } else {
-          _memberOverrides[userId]!.add(permission);
-        }
+        _memberOverrides.putIfAbsent(userId, () => {})[permission] = !enable;
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -88,10 +88,23 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
       return;
     }
 
-    // Check user permissions for approval
+    // Check user permissions
     final permsAsync = ref.read(userPermissionsProvider);
     final userPerms = permsAsync.valueOrNull ?? UserPermissions.empty;
-    final isAutoApproved = userPerms.canApproveTransactions || userPerms.isOwner || userPerms.isOrgCreator;
+    final canAdd = userPerms.canAddTransactions || userPerms.isOwner || userPerms.isOrgCreator;
+
+    if (!canAdd) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ You do not have permission to add transactions in this organization.'),
+          backgroundColor: AppColors.expense,
+        ),
+      );
+      return;
+    }
+
+    // Only Owner, Org Creator, or explicitly granted Approvers are auto-approved
+    final isAutoApproved = userPerms.isOwner || userPerms.isOrgCreator || userPerms.canApproveTransactions;
     final approvalStatus = isAutoApproved ? 'approved' : 'pending';
 
     setState(() => _isLoading = true);
@@ -139,7 +152,7 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '${_type == 'income' ? 'Income' : 'Expense'} entry of ${CurrencyFormatter.formatPaise(paise)} submitted! Awaiting Owner/President approval ⏳',
+              '${_type == 'income' ? 'Income' : 'Expense'} entry of ${CurrencyFormatter.formatPaise(paise)} submitted for Owner approval ⏳',
             ),
             backgroundColor: AppColors.pending,
             duration: const Duration(seconds: 4),
@@ -169,6 +182,10 @@ class _AddTransactionScreenState extends ConsumerState<AddTransactionScreen> {
     final isIncome = _type == 'income';
 
     final categories = isIncome ? DefaultCategories.income : DefaultCategories.expense;
+
+    final permsAsync = ref.watch(userPermissionsProvider);
+    final userPerms = permsAsync.valueOrNull ?? UserPermissions.empty;
+    final canAdd = userPerms.canAddTransactions || userPerms.isOwner || userPerms.isOrgCreator;
 
     return Scaffold(
       appBar: AppBar(
@@ -211,6 +228,29 @@ TOTAL AMOUNT:          ₹15,000.00
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!canAdd)
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    margin: const EdgeInsets.only(bottom: AppSpacing.lg),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                      border: Border.all(color: AppColors.expense.withOpacity(0.4)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.lock_rounded, color: AppColors.expense, size: 22),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Adding transactions has been disabled for your account by the Organization Owner.',
+                            style: TextStyle(color: Color(0xFF991B1B), fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // ── Type Switcher Toggle ──
                 Container(
                   height: 52,
@@ -403,9 +443,9 @@ TOTAL AMOUNT:          ₹15,000.00
 
                 // ── Submit Button ──
                 ElevatedButton(
-                  onPressed: _isLoading ? null : _handleSave,
+                  onPressed: (_isLoading || !canAdd) ? null : _handleSave,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isIncome ? AppColors.income : AppColors.expense,
+                    backgroundColor: !canAdd ? Colors.grey : (isIncome ? AppColors.income : AppColors.expense),
                   ),
                   child: _isLoading
                       ? const SizedBox(
@@ -413,7 +453,7 @@ TOTAL AMOUNT:          ₹15,000.00
                           width: 22,
                           child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                         )
-                      : Text('Save ${isIncome ? 'Income' : 'Expense'} Entry'),
+                      : Text(!canAdd ? 'Adding Disabled by Owner' : 'Save ${isIncome ? 'Income' : 'Expense'} Entry'),
                 ),
               ],
             ),

@@ -9,6 +9,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../services/whatsapp_share_service.dart';
 import 'package:mitra/features/organization/providers/org_providers.dart';
+import 'package:mitra/features/organization/providers/permissions_provider.dart';
 import 'package:mitra/features/transactions/providers/transaction_providers.dart';
 
 /// Transaction List Screen displaying live ledger transactions from Supabase.
@@ -39,16 +40,20 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> w
     final colorScheme = Theme.of(context).colorScheme;
     final brightness = Theme.of(context).brightness;
     final txnsAsync = ref.watch(orgTransactionsProvider);
+    final permsAsync = ref.watch(userPermissionsProvider);
+    final userPerms = permsAsync.valueOrNull ?? UserPermissions.empty;
+    final canAdd = userPerms.canAddTransactions || userPerms.isOwner || userPerms.isOrgCreator;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Digital Book Ledger'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_rounded),
-            tooltip: 'Add Entry',
-            onPressed: () => context.push(AppRoutes.addTransaction),
-          ),
+          if (canAdd)
+            IconButton(
+              icon: const Icon(Icons.add_rounded),
+              tooltip: 'Add Entry',
+              onPressed: () => context.push(AppRoutes.addTransaction),
+            ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -82,14 +87,14 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> w
                       Icon(Icons.receipt_long_outlined, size: 64, color: colorScheme.onSurfaceVariant.withOpacity(0.4)),
                       const SizedBox(height: AppSpacing.md),
                       Text('No transaction entries yet', style: AppTypography.titleLarge.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text('Tap "+ Add Entry" to record income, donations, or expenses.', textAlign: TextAlign.center, style: AppTypography.bodySmall),
-                      const SizedBox(height: AppSpacing.xl),
-                      ElevatedButton.icon(
-                        onPressed: () => context.push(AppRoutes.addTransaction),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add Entry'),
-                      ),
+                      if (canAdd) ...[
+                        const SizedBox(height: AppSpacing.xl),
+                        ElevatedButton.icon(
+                          onPressed: () => context.push(AppRoutes.addTransaction),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Add Entry'),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -207,11 +212,13 @@ class _TransactionListScreenState extends ConsumerState<TransactionListScreen> w
           },
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(AppRoutes.addTransaction),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Entry'),
-      ),
+      floatingActionButton: canAdd
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push(AppRoutes.addTransaction),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add Entry'),
+            )
+          : null,
     );
   }
 }

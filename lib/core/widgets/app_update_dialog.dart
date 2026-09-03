@@ -13,6 +13,8 @@ class AppUpdateDialog extends StatelessWidget {
     required this.updateInfo,
   });
 
+  static String? _lastPromptedVersion;
+
   /// Checks for update and shows this dialog if an update is available.
   /// If [showToastIfUpToDate] is true (e.g. manual check), shows a confirmation snackbar.
   static Future<void> checkAndShow(
@@ -24,6 +26,11 @@ class AppUpdateDialog extends StatelessWidget {
     if (!context.mounted) return;
 
     if (info.isUpdateAvailable) {
+      if (!showToastIfUpToDate && _lastPromptedVersion == info.latestVersion) {
+        return;
+      }
+      _lastPromptedVersion = info.latestVersion;
+
       showDialog(
         context: context,
         barrierDismissible: true,
